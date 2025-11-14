@@ -37,7 +37,7 @@ class UserPreferences:
 class CineMatchRecommender:
     """Content-based movie recommender using TF-IDF + genres + cosine similarity"""
     
-    def __init__(self, artifacts_dir: str = "backend/ml/artifacts"):
+    def __init__(self, artifacts_dir: str = "ml/artifacts"):
         """Load pre-trained artifacts"""
         self.artifacts_dir = Path(artifacts_dir)
         
@@ -90,7 +90,7 @@ class CineMatchRecommender:
             
             if liked_indices:
                 liked_features = self.item_features[liked_indices]
-                user_profile = liked_features.mean(axis=0)
+                user_profile = np.asarray(liked_features.mean(axis=0))
                 print(f"Built profile from {len(liked_indices)} liked movies")
         
         # Strategy 2: Build from explicit preferences if no likes
@@ -114,7 +114,7 @@ class CineMatchRecommender:
         
         # Fallback: return average of all movies (cold start)
         if user_profile is None:
-            user_profile = self.item_features.mean(axis=0)
+            user_profile = np.asarray(self.item_features.mean(axis=0))
             print("Using average profile (cold start)")
         
         return user_profile

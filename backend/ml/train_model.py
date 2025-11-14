@@ -19,19 +19,33 @@ import json
 from pathlib import Path
 
 
-def load_movies(data_path: str = "backend/data/movies_sample.csv") -> pd.DataFrame:
+def load_movies(data_path: str = "data/movies_merged.csv") -> pd.DataFrame:
     """Load and preprocess movies dataset"""
     print(f"Loading movies from {data_path}...")
-    df = pd.DataFrame(pd.read_csv(data_path))
+    
+    # Check if processed data exists
+    from pathlib import Path
+    if not Path(data_path).exists():
+        print(f"\n⚠️  {data_path} not found!")
+        print("   Run: python -m ml.preprocess_catalog first")
+        raise FileNotFoundError(f"{data_path} does not exist. Run preprocessing first.")
+    
+    df = pd.read_csv(data_path)
     
     # Parse pipe-separated genres and services
     df['genres_list'] = df['genres'].str.split('|')
     df['services_list'] = df['services'].str.split('|')
     
-    # Fill any missing overviews
-    df['overview'] = df['overview'].fillna('')
+    # Fill any missing overviews with title
+    df['overview'] = df['overview'].fillna(df['title'])
     
-    print(f"Loaded {len(df)} movies")
+    # Ensure required columns exist
+    required_cols = ['movieId', 'title', 'year', 'runtime', 'overview', 'genres', 'services']
+    missing = [col for col in required_cols if col not in df.columns]
+    if missing:
+        raise ValueError(f"Missing required columns: {missing}")
+    
+    print(f"✓ Loaded {len(df):,} movies")
     return df
 
 
@@ -103,7 +117,7 @@ def save_artifacts(
     genre_mlb,
     numeric_scaler,
     movies_df,
-    output_dir: str = "backend/ml/artifacts"
+    output_dir: str = "ml/artifacts"
 ):
     """Save all artifacts for inference"""
     print(f"Saving artifacts to {output_dir}...")

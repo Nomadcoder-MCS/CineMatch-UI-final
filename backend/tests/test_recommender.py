@@ -4,10 +4,12 @@ Tests for ML recommender
 
 import pytest
 import sys
+import os
 from pathlib import Path
 
-# Add backend to path
+# Add backend to path and set working directory
 sys.path.insert(0, str(Path(__file__).parent.parent))
+os.chdir(Path(__file__).parent.parent)
 
 from ml.recommender import CineMatchRecommender, UserPreferences
 

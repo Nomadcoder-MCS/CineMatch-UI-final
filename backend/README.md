@@ -72,7 +72,44 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Train ML Model
+### 2. Prepare Data
+
+#### Option A: Quick Start (MovieLens Only - No TMDb Required)
+
+```bash
+# From backend/ directory
+python -m ml.preprocess_catalog
+```
+
+This processes ~87K movies from MovieLens 32M in ~30 seconds.
+
+#### Option B: Full Pipeline (with TMDb Metadata - Recommended)
+
+**Step 1**: Get TMDb API token from https://www.themoviedb.org/settings/api
+
+**Step 2**: Create `.env` file:
+```bash
+cp .env.example .env
+# Edit .env and add your TMDB_BEARER_TOKEN
+```
+
+**Step 3**: Fetch TMDb data (test with 500 movies first):
+```bash
+python -m scripts.fetch_tmdb_metadata
+```
+
+For production (all 87K movies, ~5-6 hours):
+- Edit `scripts/fetch_tmdb_metadata.py`: set `MAX_IDS = None`
+- Run: `python -m scripts.fetch_tmdb_metadata`
+
+**Step 4**: Preprocess with TMDb:
+```bash
+python -m ml.preprocess_catalog
+```
+
+See **[DATA_PIPELINE.md](DATA_PIPELINE.md)** for complete documentation.
+
+### 3. Train ML Model
 
 ```bash
 # From backend/ directory
@@ -80,7 +117,7 @@ python -m ml.train_model
 ```
 
 This will:
-- Load `data/movies_sample.csv`
+- Load `data/movies_merged.csv` (60-87K movies)
 - Build TF-IDF, genre, and numeric features
 - Save artifacts to `ml/artifacts/`
 
@@ -89,17 +126,17 @@ Output:
 ============================================================
 CineMatch Content-Based Recommender - Training
 ============================================================
-Loading movies from backend/data/movies_sample.csv...
-Loaded 30 movies
+Loading movies from data/movies_merged.csv...
+✓ Loaded 62,485 movies
 Building TF-IDF features from overviews...
-TF-IDF matrix shape: (30, 500)
+TF-IDF matrix shape: (62485, 500)
 Building genre features...
-Genre matrix shape: (30, 25)
+Genre matrix shape: (62485, 25)
 ...
 ✓ All artifacts saved successfully!
 ```
 
-### 3. Run FastAPI Server
+### 4. Run FastAPI Server
 
 ```bash
 # From backend/ directory
@@ -110,7 +147,7 @@ Server will start on `http://localhost:8000`
 
 API docs available at: `http://localhost:8000/docs`
 
-### 4. Run Tests
+### 5. Run Tests
 
 ```bash
 # From backend/ directory
