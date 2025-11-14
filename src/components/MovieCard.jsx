@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TagChip from './TagChip';
-import { addToWatchlist, recordFeedback, markNotInterested } from '../services/recommendations';
+import { addToWatchlist } from '../api/cinematchApi';  // ML Backend
+// TODO: Implement recordFeedback and markNotInterested in backend
 
 /**
  * MovieCard - Displays a movie recommendation with actions
@@ -12,26 +13,38 @@ export default function MovieCard({ movie, userId = 'user123' }) {
 
   const handleThumbsUp = async () => {
     setFeedback('like');
-    await recordFeedback(userId, movie.id, true);
+    // TODO: Implement recordFeedback endpoint in backend
+    console.log('Liked movie:', movie.id);
   };
 
   const handleThumbsDown = async () => {
     setFeedback('dislike');
-    await recordFeedback(userId, movie.id, false);
+    // TODO: Implement recordFeedback endpoint in backend
+    console.log('Disliked movie:', movie.id);
   };
 
   const handleNotInterested = async () => {
-    await markNotInterested(userId, movie.id);
+    // TODO: Implement markNotInterested endpoint in backend
+    console.log('Not interested in movie:', movie.id);
     alert('We\'ll show you fewer movies like this.');
   };
 
   const handleAddToWatchlist = async () => {
-    await addToWatchlist(userId, movie.id);
-    navigate('/watchlist');
+    try {
+      await addToWatchlist(userId, movie.id);
+      alert(`Added "${movie.title}" to your watchlist!`);
+      navigate('/watchlist');
+    } catch (error) {
+      console.error('Error adding to watchlist:', error);
+      alert('Could not add to watchlist. Make sure the backend is running.');
+    }
   };
 
   const handleWhyThis = () => {
-    alert(`Why we recommended "${movie.title}":\n\n• Matches your preferred genres\n• High rating from users with similar taste\n• Available on your connected streaming services`);
+    // Use ML-generated explanation if available
+    const explanation = movie.explanation || 
+      `Why we recommended "${movie.title}":\n\n• Matches your preferred genres\n• High rating from users with similar taste\n• Available on your connected streaming services`;
+    alert(explanation);
   };
 
   return (

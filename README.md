@@ -29,6 +29,10 @@ A production-quality React + Tailwind CSS movie recommendation app with clean de
 
 ## Project Structure
 
+This project contains both a **React frontend** and a **Python ML backend**:
+
+### Frontend (React + Tailwind)
+
 ```
 src/
 ├── pages/
@@ -43,22 +47,93 @@ src/
 │   ├── WatchlistItem.jsx     # Watchlist entry row
 │   ├── TagChip.jsx           # Genre/service badges
 │   └── FilterChip.jsx        # Interactive filter pills
-├── services/
-│   └── recommendations.js    # API integration layer (mock data)
+├── api/
+│   └── cinematchApi.js       # Backend API client
 ├── App.jsx                   # Main app with routing
 ├── main.jsx                  # Entry point
 └── index.css                 # Tailwind imports + minimal global styles
 ```
 
+### Backend (Python + FastAPI + scikit-learn)
+
+```
+backend/
+├── app/
+│   ├── main.py              # FastAPI application
+│   ├── api/
+│   │   ├── routes_recs.py   # Recommendation endpoints
+│   │   └── routes_watchlist.py  # Watchlist endpoints
+│   └── schemas/             # Pydantic models
+├── ml/
+│   ├── train_model.py       # Training pipeline
+│   ├── recommender.py       # Content-based recommender
+│   └── artifacts/           # Saved model artifacts
+├── data/
+│   └── movies_sample.csv    # Sample dataset (30 movies)
+├── tests/                   # Pytest tests
+└── requirements.txt
+```
+
 ## Getting Started
 
-### Installation
+### Prerequisites
+
+- **Node.js** 18+ (for frontend)
+- **Python** 3.10+ (for backend)
+
+### Backend Setup (Python ML Engine)
+
+#### 1. Install Python Dependencies
 
 ```bash
+cd backend
+python -m venv .venv
+
+# Activate virtual environment
+source .venv/bin/activate  # macOS/Linux
+# or
+.venv\Scripts\activate  # Windows
+
+pip install -r requirements.txt
+```
+
+#### 2. Train ML Model
+
+```bash
+# From backend/ directory
+python -m ml.train_model
+```
+
+This builds the content-based recommender using TF-IDF + genre features and saves artifacts to `ml/artifacts/`.
+
+#### 3. Start Backend Server
+
+```bash
+# From backend/ directory
+uvicorn app.main:app --reload --port 8000
+```
+
+Backend will run on `http://localhost:8000`
+
+API docs: `http://localhost:8000/docs`
+
+#### 4. Run Backend Tests
+
+```bash
+# From backend/ directory
+pytest tests/ -v
+```
+
+### Frontend Setup (React UI)
+
+#### 1. Install Dependencies
+
+```bash
+# From project root
 npm install
 ```
 
-### Development
+#### 2. Start Development Server
 
 ```bash
 npm run dev
@@ -66,13 +141,15 @@ npm run dev
 
 Visit `http://localhost:5173` to see the app.
 
-### Build
+The frontend will automatically connect to the backend at `http://localhost:8000`.
+
+#### 3. Build for Production
 
 ```bash
 npm run build
 ```
 
-### Test
+#### 4. Run Frontend Tests
 
 ```bash
 # Run all tests
@@ -86,6 +163,67 @@ npm run test:coverage
 ```
 
 See **[TESTING.md](TESTING.md)** for comprehensive testing guide.
+
+## ML Recommendation Engine
+
+### How It Works
+
+**Content-Based Filtering** using scikit-learn:
+
+1. **Feature Engineering**
+   - **TF-IDF**: Extract 500 features from movie overviews using unigrams + bigrams
+   - **Genres**: Multi-hot encode genres (25 unique genres)
+   - **Numeric**: Scale year and runtime
+   - **Combined**: Horizontal stack into sparse feature matrix (30 movies × 527 features)
+
+2. **User Profile**
+   - Average feature vectors of liked movies
+   - Or build from explicit genre/service preferences
+   - Cold start: use dataset average
+
+3. **Ranking**
+   - Compute cosine similarity between user profile and all movie features
+   - Apply filters (genres, services, runtime, exclude liked/disliked)
+   - Return top-k ranked by similarity
+
+4. **Explainability**
+   - Generate human-readable reasons for each recommendation
+   - Based on genre matches, service availability, similarity
+
+### Example API Call
+
+```javascript
+// Frontend calls backend
+const recommendations = await fetchRecommendations({
+  user_id: 'alex',
+  liked_movie_ids: [1, 5],  // Movies user liked
+  preferred_genres: ['Sci-Fi', 'Action'],
+  services: ['Netflix'],
+  runtime_min: 90,
+  runtime_max: 150
+});
+
+// Backend returns ranked movies with explanations
+// [
+//   {
+//     movie_id: 10,
+//     title: "Crimson Horizon",
+//     score: 0.87,
+//     explanation: "Matches your preferred genres: Sci-Fi, Action • Available on Netflix"
+//   },
+//   ...
+// ]
+```
+
+### Dataset
+
+Sample dataset (`backend/data/movies_sample.csv`) contains 30 movies with:
+- Genres: Sci-Fi, Action, Drama, Comedy, Horror, Romance, Thriller, etc.
+- Services: Netflix, Hulu, Amazon Prime, HBO Max
+- Years: 2021-2023
+- Runtimes: 89-145 minutes
+
+To add more movies, edit the CSV and re-run `python -m ml.train_model`.
 
 ## Integration with Python Backend
 
@@ -158,6 +296,8 @@ The following endpoints should be implemented in your Python backend:
 
 ## Tech Stack
 
+### Frontend
+
 - **React** 18.2 - UI framework
 - **React Router** 6.20 - Client-side routing
 - **Tailwind CSS** 3.4 - Utility-first styling
@@ -165,6 +305,17 @@ The following endpoints should be implemented in your Python backend:
 - **Vitest** 1.0 - Testing framework
 - **React Testing Library** 14.1 - Component testing
 - **Jest-DOM** 6.1 - Custom matchers
+
+### Backend
+
+- **Python** 3.10+
+- **FastAPI** 0.104 - Modern async web framework
+- **Uvicorn** 0.24 - ASGI server
+- **scikit-learn** 1.3 - ML library (TF-IDF, cosine similarity)
+- **pandas** 2.1 - Data manipulation
+- **numpy** 1.26 - Numerical computing
+- **Pydantic** 2.5 - Data validation
+- **pytest** 7.4 - Testing
 
 ## Key Features for Backend Integration
 

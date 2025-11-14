@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import TopNavSignedIn from '../components/TopNavSignedIn';
 import FilterChip from '../components/FilterChip';
 import MovieCard from '../components/MovieCard';
-import { fetchRecommendations } from '../services/recommendations';
+import { fetchRecommendations } from '../api/cinematchApi';  // ML Backend
 
 /**
  * HomePage - Main recommendations dashboard for signed-in users
@@ -27,10 +27,21 @@ export default function HomePage() {
   const loadRecommendations = async () => {
     setLoading(true);
     try {
-      const recommendations = await fetchRecommendations(userId);
+      // Call ML backend with user preferences
+      const recommendations = await fetchRecommendations({
+        user_id: userId,
+        liked_movie_ids: [],  // TODO: Track from thumbs up
+        disliked_movie_ids: [],  // TODO: Track from thumbs down
+        preferred_genres: activeFilters.genre ? ['Sci-Fi', 'Action'] : [],
+        services: activeFilters.service ? ['Netflix'] : [],
+        runtime_min: null,
+        runtime_max: null,
+      });
       setMovies(recommendations);
     } catch (error) {
-      console.error('Error loading recommendations:', error);
+      console.error('Error loading recommendations from ML backend:', error);
+      // Show user-friendly error
+      alert('Could not load recommendations. Make sure the backend is running on http://localhost:8000');
     } finally {
       setLoading(false);
     }

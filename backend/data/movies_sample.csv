@@ -1,0 +1,32 @@
+movie_id,title,year,runtime,overview,genres,services
+1,Neon City,2023,130,"A cyberpunk thriller set in a dystopian future where a hacker discovers a conspiracy that threatens the last free city on Earth.",Sci-Fi|Action|Thriller,Netflix
+2,The Last Garden,2022,115,"An emotional drama about three generations of a family tending to their ancestral garden while navigating cultural conflicts and hidden secrets.",Drama|Family,Hulu|Amazon Prime
+3,Velocity,2023,125,"High-octane action as a former race car driver is pulled back into the underground racing world to save his brother from a dangerous syndicate.",Action|Thriller,Netflix|HBO Max
+4,Moonlight Serenade,2021,108,"A jazz musician and a painter fall in love in 1950s New York, but their conflicting dreams threaten to pull them apart.",Romance|Drama|Music,Amazon Prime
+5,The Algorithm,2023,140,"A tech thriller about an AI system that begins making decisions beyond its programming, forcing its creators to question who is really in control.",Sci-Fi|Thriller,Netflix
+6,Echoes of Tomorrow,2022,118,"A time-travel mystery where a physicist must prevent a catastrophic event by communicating with her past self through quantum entanglement.",Sci-Fi|Mystery,HBO Max
+7,Wildflower,2021,102,"A coming-of-age story about a teenage girl finding her voice and identity while navigating family expectations in a small rural town.",Drama|Coming-of-Age,Hulu
+8,Shadow Protocol,2023,136,"An elite spy must go rogue to stop a global conspiracy after discovering her own agency has been compromised from within.",Action|Thriller|Spy,Amazon Prime|Netflix
+9,The Chef's Table,2022,95,"A heartwarming comedy about a struggling chef who inherits a failing restaurant and must learn to trust her unconventional team.",Comedy|Drama,Hulu
+10,Crimson Horizon,2023,145,"An epic space opera following a ragtag crew of rebels fighting against an oppressive galactic empire.",Sci-Fi|Action|Adventure,Netflix|HBO Max
+11,Whispers in the Dark,2021,110,"A psychological horror about a therapist who begins experiencing her patients' nightmares, blurring the line between reality and dreams.",Horror|Thriller,Amazon Prime
+12,The Painted Veil,2022,122,"A period drama set in 1920s China, where a British couple must confront their failing marriage during a cholera epidemic.",Drama|Romance|Historical,Hulu|HBO Max
+13,Quantum Break,2023,128,"A sci-fi action film where a man gains the ability to manipulate time after a lab accident, but each use causes dangerous temporal anomalies.",Sci-Fi|Action,Netflix
+14,Midnight in Paris,2021,105,"A romantic comedy about an American writer who discovers he can travel back to 1920s Paris every night at midnight.",Romance|Comedy|Fantasy,Amazon Prime
+15,The Reckoning,2022,133,"A gritty Western about a former outlaw seeking redemption by protecting a small town from a ruthless gang.",Western|Action|Drama,HBO Max
+16,Silent Echo,2023,112,"A suspenseful thriller about a deaf woman who witnesses a murder and must evade the killers while unable to call for help.",Thriller|Suspense,Hulu|Netflix
+17,Stardust Dreams,2021,98,"An animated adventure about a young girl who travels through a magical galaxy to rescue her kidnapped father from an evil sorcerer.",Animation|Adventure|Family,Amazon Prime
+18,The Forgetting,2022,124,"A dystopian drama where society has developed technology to selectively erase traumatic memories, but at what cost?",Sci-Fi|Drama,Netflix
+19,Laughing Matter,2023,89,"A laugh-out-loud comedy about a stand-up comedian who accidentally becomes a viral sensation for all the wrong reasons.",Comedy,Hulu
+20,Blood Moon Rising,2021,142,"A supernatural horror epic about a small Alaskan town terrorized by ancient creatures that emerge during a month-long polar night.",Horror|Action|Supernatural,HBO Max|Netflix
+21,The Virtuoso,2022,116,"A classical music prodigy struggles with perfectionism and self-doubt as she prepares for the competition that could make or break her career.",Drama|Music,Amazon Prime
+22,Neon Nights,2023,107,"A stylish crime thriller set in Tokyo's underground nightclub scene, where a detective hunts a serial killer targeting club owners.",Crime|Thriller,Netflix
+23,Home Run,2021,94,"An inspiring sports drama about a washed-up baseball player who gets one last chance to prove himself while coaching a little league team.",Sports|Drama|Family,Hulu
+24,The Infinite Loop,2022,131,"A mind-bending sci-fi mystery about a woman stuck in a time loop who must solve her own murder to escape.",Sci-Fi|Mystery|Thriller,Netflix|HBO Max
+25,Autumn Leaves,2023,103,"A poignant drama exploring aging, memory, and family bonds as an elderly woman with dementia tries to hold onto her identity.",Drama,Amazon Prime|Hulu
+26,Thunder Road,2021,121,"An adrenaline-fueled action movie about truckers who transport illegal cargo across dangerous territories while evading corrupt authorities.",Action|Crime,HBO Max
+27,The Enchanted Forest,2022,96,"A family fantasy adventure where siblings discover a magical forest inhabited by talking animals and must save it from developers.",Family|Fantasy|Adventure,Amazon Prime
+28,Dark Waters,2023,127,"An environmental thriller based on true events about a lawyer taking on a chemical company polluting a small town's water supply.",Thriller|Drama,Netflix
+29,Love in Bloom,2021,92,"A romantic comedy about rival florists who are forced to work together on a high-profile wedding and unexpectedly fall in love.",Romance|Comedy,Hulu
+30,The Last Samurai's Honor,2022,138,"A historical action epic about a ronin warrior in feudal Japan who must protect a village from bandits.",Action|Historical|Drama,HBO Max|Netflix
+

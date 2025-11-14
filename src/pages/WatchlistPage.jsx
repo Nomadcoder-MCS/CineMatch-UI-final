@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopNavSignedIn from '../components/TopNavSignedIn';
 import WatchlistItem from '../components/WatchlistItem';
-import { fetchWatchlist } from '../services/recommendations';
+import { fetchWatchlist } from '../api/cinematchApi';  // ML Backend
 
 /**
  * WatchlistPage - User's saved movies to watch later
@@ -24,7 +24,9 @@ export default function WatchlistPage() {
       const items = await fetchWatchlist(userId);
       setWatchlist(items);
     } catch (error) {
-      console.error('Error loading watchlist:', error);
+      console.error('Error loading watchlist from ML backend:', error);
+      // Backend might not be running - show empty state gracefully
+      setWatchlist([]);
     } finally {
       setLoading(false);
     }

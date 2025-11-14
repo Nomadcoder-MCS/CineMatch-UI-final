@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import TagChip from './TagChip';
-import { markWatched, removeFromWatchlist } from '../services/recommendations';
+import { markWatched, removeFromWatchlist } from '../api/cinematchApi';  // ML Backend
 
 /**
  * WatchlistItem - Compact row layout for watchlist entries
@@ -11,14 +11,24 @@ export default function WatchlistItem({ item, userId = 'user123', onUpdate }) {
   const handleToggleWatched = async () => {
     const newWatchedState = !isWatched;
     setIsWatched(newWatchedState);
-    await markWatched(userId, item.id, newWatchedState);
-    if (onUpdate) onUpdate();
+    try {
+      await markWatched(userId, item.id, newWatchedState);
+      if (onUpdate) onUpdate();
+    } catch (error) {
+      console.error('Error marking watched:', error);
+      setIsWatched(!newWatchedState);  // Revert on error
+    }
   };
 
   const handleRemove = async () => {
     if (confirm(`Remove "${item.title}" from your watchlist?`)) {
-      await removeFromWatchlist(userId, item.id);
-      if (onUpdate) onUpdate();
+      try {
+        await removeFromWatchlist(userId, item.id);
+        if (onUpdate) onUpdate();
+      } catch (error) {
+        console.error('Error removing from watchlist:', error);
+        alert('Could not remove from watchlist');
+      }
     }
   };
 
