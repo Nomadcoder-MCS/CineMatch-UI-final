@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import TopNavSignedOut from '../components/TopNavSignedOut';
@@ -8,18 +9,47 @@ import TagChip from '../components/TagChip';
  */
 export default function LandingPage() {
   const navigate = useNavigate();
-  const { identifyUser } = useAuth();
+  const { user, identifyUser } = useAuth();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleGetStarted = async () => {
+  // Redirect to home if already signed in
+  useEffect(() => {
+    if (user) {
+      navigate('/home');
+    }
+  }, [user, navigate]);
+
+  const handleGetStarted = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    // Validate inputs
+    if (!name.trim()) {
+      setError('Please enter your name');
+      return;
+    }
+    if (!email.trim()) {
+      setError('Please enter your email');
+      return;
+    }
+    if (!email.includes('@')) {
+      setError('Please enter a valid email');
+      return;
+    }
+
+    setIsLoading(true);
     try {
-      // Auto-identify as demo user for simplicity (school project)
-      // In production, you'd have a proper sign-up/sign-in form
-      await identifyUser('Alex Johnson', 'alex.johnson@email.com');
+      await identifyUser(name.trim(), email.trim());
+      // Navigation happens automatically after user is set
       navigate('/home');
     } catch (error) {
       console.error('Failed to identify user:', error);
-      // Navigate anyway for demo purposes
-      navigate('/home');
+      setError('Could not connect to server. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -38,20 +68,43 @@ export default function LandingPage() {
             <p className="text-lg text-brand-text-body mb-8">
               Set your preferences once and get smart movie recommendations every night.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4">
+
+            {/* Sign-up form */}
+            <form onSubmit={handleGetStarted} className="space-y-4 max-w-md">
+              <div>
+                <input
+                  type="text"
+                  placeholder="Your name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-brand-border focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent"
+                  disabled={isLoading}
+                />
+              </div>
+              <div>
+                <input
+                  type="email"
+                  placeholder="Your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-brand-border focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent"
+                  disabled={isLoading}
+                />
+              </div>
+              {error && (
+                <p className="text-sm text-red-600">{error}</p>
+              )}
               <button
-                onClick={handleGetStarted}
-                className="px-8 py-3 bg-brand-orange text-white rounded-xl font-semibold text-base hover:bg-[#e05d00] transition-colors"
+                type="submit"
+                disabled={isLoading}
+                className="w-full px-8 py-3 bg-brand-orange text-white rounded-xl font-semibold text-base hover:bg-[#e05d00] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Get started
+                {isLoading ? 'Getting started...' : 'Get started'}
               </button>
-              <button
-                onClick={handleGetStarted}
-                className="px-8 py-3 text-brand-orange hover:text-brand-purple transition-colors font-medium text-base"
-              >
-                Try a sample recommendation →
-              </button>
-            </div>
+              <p className="text-xs text-brand-text-secondary">
+                No password required. We'll remember you by email for this session.
+              </p>
+            </form>
           </div>
 
           {/* Right side - Mock recommendation card */}
