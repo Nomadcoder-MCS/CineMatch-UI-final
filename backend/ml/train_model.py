@@ -139,7 +139,7 @@ def save_artifacts(
         pickle.dump(numeric_scaler, f)
     
     # Save movie metadata
-    movies_meta = movies_df[['movie_id', 'title', 'year', 'runtime', 'overview', 'genres', 'services']].to_dict('records')
+    movies_meta = movies_df[['movieId', 'title', 'year', 'runtime', 'overview', 'genres', 'services']].to_dict('records')
     
     with open(output_path / "movies_meta.json", 'w') as f:
         json.dump(movies_meta, f, indent=2)

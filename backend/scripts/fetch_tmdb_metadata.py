@@ -10,7 +10,7 @@ LANG     = "en-US"
 APPENDS  = "credits,keywords"
 
 # Safety: start small for testing, then set to None for full run
-MAX_IDS  = 500   # Start with 500, then set to None for production
+MAX_IDS  = None   # Start with 500, then set to None for production
 
 def bearer_headers():
     load_dotenv()

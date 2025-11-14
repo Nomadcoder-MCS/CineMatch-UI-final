@@ -1,13 +1,34 @@
 # CineMatch - Quick Movie Picks for Busy Students
 
-A production-quality React + Tailwind CSS movie recommendation app with clean design, reusable components, and clear integration points for a Python recommendation engine backend.
+A production-quality React + Tailwind CSS movie recommendation app with clean design, reusable components, and a **Python ML backend powered by MovieLens 32M** (87K movies).
 
-## Features
+## 🎬 Features
 
 - **Landing Page**: Marketing page with hero section, "How it works", and "For students" sections
 - **Home Page**: Personalized movie recommendations dashboard with filters and context chips
 - **Watchlist Page**: Save and manage movies to watch later
 - **Profile Page**: Account settings, preferences, connected services, and data controls
+- **ML Backend**: Content-based recommender using MovieLens 32M + optional TMDb enrichment
+
+## 🚀 Quick Start
+
+### Frontend
+```bash
+npm install
+npm run dev
+```
+Visit http://localhost:5173
+
+### Backend (Quick Setup)
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+python setup_pipeline.py   # Interactive setup wizard
+```
+
+**Full documentation:** [`backend/UPGRADE_COMPLETE.md`](backend/UPGRADE_COMPLETE.md)
 
 ## Design System
 
@@ -67,10 +88,19 @@ backend/
 ├── ml/
 │   ├── train_model.py       # Training pipeline
 │   ├── recommender.py       # Content-based recommender
+│   ├── preprocess_catalog.py  # Data preprocessing
 │   └── artifacts/           # Saved model artifacts
+├── raw/
+│   ├── ml-32m/              # MovieLens 32M dataset (87K movies)
+│   └── tmdb/                # TMDb metadata (optional)
 ├── data/
-│   └── movies_sample.csv    # Sample dataset (30 movies)
+│   └── movies_merged.csv    # Processed catalog (60-87K movies)
+├── scripts/
+│   └── fetch_tmdb_metadata.py  # TMDb API integration
 ├── tests/                   # Pytest tests
+├── setup_pipeline.py        # Interactive setup wizard
+├── DATA_PIPELINE.md         # Complete pipeline documentation
+├── MIGRATION_GUIDE.md       # Migration from toy dataset
 └── requirements.txt
 ```
 
@@ -83,46 +113,68 @@ backend/
 
 ### Backend Setup (Python ML Engine)
 
-#### 1. Install Python Dependencies
+#### Quick Setup (Recommended)
 
 ```bash
 cd backend
 python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+python setup_pipeline.py   # Interactive wizard
+```
 
-# Activate virtual environment
-source .venv/bin/activate  # macOS/Linux
-# or
-.venv\Scripts\activate  # Windows
+The setup wizard will guide you through:
+1. ✅ Checking data files
+2. ✅ Preprocessing MovieLens 32M (87K movies)
+3. ✅ Training ML model
+4. ✅ Verifying everything works
 
+**Result:** Backend with 60K+ movies ready to use!
+
+#### Manual Setup
+
+**Step 1:** Install dependencies
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-#### 2. Train ML Model
-
+**Step 2:** Preprocess data
 ```bash
-# From backend/ directory
+python -m ml.preprocess_catalog
+```
+
+**Step 3:** Train ML model
+```bash
 python -m ml.train_model
 ```
 
-This builds the content-based recommender using TF-IDF + genre features and saves artifacts to `ml/artifacts/`.
-
-#### 3. Start Backend Server
-
+**Step 4:** Start backend server
 ```bash
-# From backend/ directory
 uvicorn app.main:app --reload --port 8000
 ```
 
-Backend will run on `http://localhost:8000`
-
+Backend will run on `http://localhost:8000`  
 API docs: `http://localhost:8000/docs`
 
-#### 4. Run Backend Tests
-
+**Step 5:** Run tests
 ```bash
-# From backend/ directory
 pytest tests/ -v
 ```
+
+#### Optional: Add TMDb Metadata
+
+For higher quality recommendations with cast, directors, plot summaries:
+
+1. Get API token from https://www.themoviedb.org/settings/api
+2. Create `.env` file: `TMDB_BEARER_TOKEN=your_token`
+3. Run: `python -m scripts.fetch_tmdb_metadata`
+4. Reprocess: `python -m ml.preprocess_catalog`
+5. Retrain: `python -m ml.train_model`
+
+**See [`backend/DATA_PIPELINE.md`](backend/DATA_PIPELINE.md) for complete documentation.**
 
 ### Frontend Setup (React UI)
 

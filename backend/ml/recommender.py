@@ -62,7 +62,7 @@ class CineMatchRecommender:
         
         # Create movie_id to index mapping
         self.movie_id_to_idx = {
-            movie['movie_id']: idx 
+            movie['movieId']: idx 
             for idx, movie in enumerate(self.movies_meta)
         }
         
@@ -129,7 +129,7 @@ class CineMatchRecommender:
         
         for idx in candidate_indices:
             movie = self.movies_meta[idx]
-            movie_id = movie['movie_id']
+            movie_id = movie['movieId']
             
             # Exclude already liked/disliked
             if movie_id in prefs.liked_movie_ids:
@@ -226,7 +226,7 @@ class CineMatchRecommender:
             movie = self.movies_meta[idx]
             
             rec = {
-                "movie_id": movie['movie_id'],
+                "movie_id": movie['movieId'],
                 "title": movie['title'],
                 "year": movie['year'],
                 "runtime": movie['runtime'],
@@ -243,9 +243,9 @@ class CineMatchRecommender:
     def get_movie_by_id(self, movie_id: int) -> Optional[dict]:
         """Get movie metadata by ID"""
         for movie in self.movies_meta:
-            if movie['movie_id'] == movie_id:
+            if movie['movieId'] == movie_id:
                 return {
-                    "movie_id": movie['movie_id'],
+                    "movie_id": movie['movieId'],
                     "title": movie['title'],
                     "year": movie['year'],
                     "runtime": movie['runtime'],
