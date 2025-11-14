@@ -1,42 +1,66 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TagChip from './TagChip';
-import { addToWatchlist } from '../api/cinematchApi';  // ML Backend
-// TODO: Implement recordFeedback and markNotInterested in backend
+import api from '../api/client';
 
 /**
  * MovieCard - Displays a movie recommendation with actions
  */
-export default function MovieCard({ movie, userId = 'user123' }) {
+export default function MovieCard({ movie }) {
   const navigate = useNavigate();
   const [feedback, setFeedback] = useState(null); // 'like' | 'dislike' | null
 
   const handleThumbsUp = async () => {
     setFeedback('like');
-    // TODO: Implement recordFeedback endpoint in backend
-    console.log('Liked movie:', movie.id);
+    try {
+      await api.post('/api/feedback', {
+        movie_id: movie.movie_id || movie.id,
+        signal: 'like'
+      });
+      console.log('✓ Liked movie:', movie.title);
+    } catch (error) {
+      console.error('Error recording like:', error);
+    }
   };
 
   const handleThumbsDown = async () => {
     setFeedback('dislike');
-    // TODO: Implement recordFeedback endpoint in backend
-    console.log('Disliked movie:', movie.id);
+    try {
+      await api.post('/api/feedback', {
+        movie_id: movie.movie_id || movie.id,
+        signal: 'dislike'
+      });
+      console.log('✓ Disliked movie:', movie.title);
+    } catch (error) {
+      console.error('Error recording dislike:', error);
+    }
   };
 
   const handleNotInterested = async () => {
-    // TODO: Implement markNotInterested endpoint in backend
-    console.log('Not interested in movie:', movie.id);
-    alert('We\'ll show you fewer movies like this.');
+    try {
+      await api.post('/api/feedback', {
+        movie_id: movie.movie_id || movie.id,
+        signal: 'not_interested'
+      });
+      alert('We\'ll show you fewer movies like this.');
+      console.log('✓ Marked as not interested:', movie.title);
+    } catch (error) {
+      console.error('Error marking not interested:', error);
+    }
   };
 
   const handleAddToWatchlist = async () => {
     try {
-      await addToWatchlist(userId, movie.id);
+      await api.post('/api/watchlist', {
+        movie_id: movie.movie_id || movie.id,
+        title: movie.title,
+        service: movie.services?.[0] // First service if available
+      });
       alert(`Added "${movie.title}" to your watchlist!`);
       navigate('/watchlist');
     } catch (error) {
       console.error('Error adding to watchlist:', error);
-      alert('Could not add to watchlist. Make sure the backend is running.');
+      alert('Could not add to watchlist. Make sure you are signed in.');
     }
   };
 

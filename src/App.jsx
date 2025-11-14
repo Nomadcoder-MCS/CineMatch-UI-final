@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
 import LandingPage from './pages/LandingPage';
 import HomePage from './pages/HomePage';
 import WatchlistPage from './pages/WatchlistPage';
@@ -9,14 +10,16 @@ import ProfilePage from './pages/ProfilePage';
  */
 function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/home" element={<HomePage />} />
-        <Route path="/watchlist" element={<WatchlistPage />} />
-        <Route path="/profile" element={<ProfilePage />} />
-      </Routes>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/home" element={<HomePage />} />
+          <Route path="/watchlist" element={<WatchlistPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+        </Routes>
+      </Router>
+    </AuthProvider>
   );
 }
 

@@ -2,14 +2,13 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopNavSignedIn from '../components/TopNavSignedIn';
 import WatchlistItem from '../components/WatchlistItem';
-import { fetchWatchlist } from '../api/cinematchApi';  // ML Backend
+import api from '../api/client';
 
 /**
  * WatchlistPage - User's saved movies to watch later
  */
 export default function WatchlistPage() {
   const navigate = useNavigate();
-  const userId = 'user123'; // In production, get from auth context
   const [watchlist, setWatchlist] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
@@ -21,19 +20,25 @@ export default function WatchlistPage() {
   const loadWatchlist = async () => {
     setLoading(true);
     try {
-      const items = await fetchWatchlist(userId);
-      setWatchlist(items);
+      const response = await api.get('/api/watchlist');
+      setWatchlist(response.items || []);
     } catch (error) {
-      console.error('Error loading watchlist from ML backend:', error);
-      // Backend might not be running - show empty state gracefully
+      console.error('Error loading watchlist:', error);
+      // Backend might not be running or user not authenticated
       setWatchlist([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRemoveItem = (itemId) => {
-    setWatchlist(prev => prev.filter(item => item.id !== itemId));
+  const handleRemoveItem = async (movieId) => {
+    try {
+      await api.delete(`/api/watchlist/${movieId}`);
+      setWatchlist(prev => prev.filter(item => item.movie_id !== movieId));
+    } catch (error) {
+      console.error('Error removing from watchlist:', error);
+      alert('Failed to remove from watchlist');
+    }
   };
 
   const filteredWatchlist = watchlist.filter(item => {
@@ -125,8 +130,8 @@ export default function WatchlistPage() {
                 <WatchlistItem
                   key={item.id}
                   item={item}
-                  userId={userId}
                   onUpdate={loadWatchlist}
+                  onRemove={handleRemoveItem}
                 />
               ))}
             </div>

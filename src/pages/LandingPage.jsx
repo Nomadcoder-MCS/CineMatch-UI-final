@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import TopNavSignedOut from '../components/TopNavSignedOut';
 import TagChip from '../components/TagChip';
 
@@ -7,6 +8,20 @@ import TagChip from '../components/TagChip';
  */
 export default function LandingPage() {
   const navigate = useNavigate();
+  const { identifyUser } = useAuth();
+
+  const handleGetStarted = async () => {
+    try {
+      // Auto-identify as demo user for simplicity (school project)
+      // In production, you'd have a proper sign-up/sign-in form
+      await identifyUser('Alex Johnson', 'alex.johnson@email.com');
+      navigate('/home');
+    } catch (error) {
+      console.error('Failed to identify user:', error);
+      // Navigate anyway for demo purposes
+      navigate('/home');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-brand-bg">
@@ -25,13 +40,13 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <button
-                onClick={() => navigate('/home')}
+                onClick={handleGetStarted}
                 className="px-8 py-3 bg-brand-orange text-white rounded-xl font-semibold text-base hover:bg-[#e05d00] transition-colors"
               >
                 Get started
               </button>
               <button
-                onClick={() => navigate('/home')}
+                onClick={handleGetStarted}
                 className="px-8 py-3 text-brand-orange hover:text-brand-purple transition-colors font-medium text-base"
               >
                 Try a sample recommendation →

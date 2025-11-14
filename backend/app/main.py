@@ -7,7 +7,9 @@ ML-powered movie recommendation API with content-based filtering.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import routes_recs, routes_watchlist
+from app.api import routes_auth, routes_preferences, routes_watchlist_persistence, routes_feedback
 from ml.recommender import get_recommender
+from app.db import engine, Base
 
 # Create FastAPI app
 app = FastAPI(
@@ -32,15 +34,24 @@ app.add_middleware(
 
 # Include routers
 app.include_router(routes_recs.router, tags=["recommendations"])
-app.include_router(routes_watchlist.router, tags=["watchlist"])
+app.include_router(routes_watchlist.router, tags=["watchlist"])  # Old watchlist (in-memory)
+app.include_router(routes_auth.router)
+app.include_router(routes_preferences.router)
+app.include_router(routes_watchlist_persistence.router)  # New persistent watchlist
+app.include_router(routes_feedback.router)
 
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize ML recommender on startup"""
+    """Initialize database and ML recommender on startup"""
     print("\n" + "="*60)
     print("🎬 CineMatch Backend Starting...")
     print("="*60)
+    
+    # Create database tables
+    print("Initializing database...")
+    Base.metadata.create_all(bind=engine)
+    print("✓ Database ready (SQLite: cinematch.db)")
     
     # Initialize recommender (loads artifacts)
     try:

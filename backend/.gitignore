@@ -42,6 +42,10 @@ data/*.csv
 # Environment variables
 .env
 
+# SQLite database
+*.db
+cinematch.db
+
 # IDE
 .vscode/
 .idea/

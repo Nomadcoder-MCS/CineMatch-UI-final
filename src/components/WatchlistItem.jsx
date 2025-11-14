@@ -1,29 +1,32 @@
 import { useState } from 'react';
 import TagChip from './TagChip';
-import { markWatched, removeFromWatchlist } from '../api/cinematchApi';  // ML Backend
+import api from '../api/client';
 
 /**
  * WatchlistItem - Compact row layout for watchlist entries
  */
-export default function WatchlistItem({ item, userId = 'user123', onUpdate }) {
+export default function WatchlistItem({ item, onUpdate, onRemove }) {
   const [isWatched, setIsWatched] = useState(item.watched);
 
   const handleToggleWatched = async () => {
-    const newWatchedState = !isWatched;
-    setIsWatched(newWatchedState);
-    try {
-      await markWatched(userId, item.id, newWatchedState);
-      if (onUpdate) onUpdate();
-    } catch (error) {
-      console.error('Error marking watched:', error);
-      setIsWatched(!newWatchedState);  // Revert on error
+    if (!isWatched) {
+      // Only allow marking as watched, not un-watching
+      try {
+        await api.post(`/api/watchlist/${item.movie_id}/watched`);
+        setIsWatched(true);
+        if (onUpdate) onUpdate();
+      } catch (error) {
+        console.error('Error marking watched:', error);
+        alert('Failed to mark as watched');
+      }
     }
   };
 
   const handleRemove = async () => {
     if (confirm(`Remove "${item.title}" from your watchlist?`)) {
       try {
-        await removeFromWatchlist(userId, item.id);
+        await api.delete(`/api/watchlist/${item.movie_id}`);
+        if (onRemove) onRemove(item.movie_id);
         if (onUpdate) onUpdate();
       } catch (error) {
         console.error('Error removing from watchlist:', error);
@@ -61,22 +64,12 @@ export default function WatchlistItem({ item, userId = 'user123', onUpdate }) {
           </div>
 
           <p className="text-xs text-brand-text-secondary mb-2">
-            {item.year} · {item.runtime}
+            {item.service || 'Streaming service'}
           </p>
 
-          <p className="text-sm text-brand-text-body mb-3 line-clamp-2">
-            {item.synopsis}
+          <p className="text-sm text-brand-text-body mb-3">
+            Movie ID: {item.movie_id}
           </p>
-
-          {/* Tags */}
-          <div className="flex flex-wrap gap-2 mb-3">
-            {item.genres.slice(0, 2).map((genre) => (
-              <TagChip key={genre} label={genre} variant="genre" />
-            ))}
-            {item.services.slice(0, 2).map((service) => (
-              <TagChip key={service} label={service} variant="service" />
-            ))}
-          </div>
 
           {/* Actions */}
           <div className="flex items-center gap-3">
@@ -90,7 +83,7 @@ export default function WatchlistItem({ item, userId = 'user123', onUpdate }) {
               <span className="text-xs text-brand-text-body">Mark watched</span>
             </label>
             <span className="text-xs text-brand-text-secondary">
-              Added {new Date(item.addedDate).toLocaleDateString()}
+              Added {new Date(item.created_at).toLocaleDateString()}
             </span>
           </div>
         </div>
