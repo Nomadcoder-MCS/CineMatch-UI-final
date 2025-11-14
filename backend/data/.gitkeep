@@ -1,0 +1,3 @@
+# This file ensures the data/ directory is tracked by git
+# Processed CSV files (movies_merged.csv) will be generated here by preprocess_catalog.py
+

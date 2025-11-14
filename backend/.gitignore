@@ -31,6 +31,17 @@ ml/artifacts/*.npz
 ml/artifacts/*.pkl
 ml/artifacts/*.json
 
+# Raw data files (large, downloadable from source)
+raw/ml-32m/*.csv
+raw/ml-32m/*.txt
+raw/tmdb/*.csv
+
+# Processed data files
+data/*.csv
+
+# Environment variables
+.env
+
 # IDE
 .vscode/
 .idea/

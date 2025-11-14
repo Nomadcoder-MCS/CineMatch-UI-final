@@ -1,0 +1,3 @@
+# This file ensures the tmdb/ directory is tracked by git
+# TMDb metadata CSV files will be generated here by fetch_tmdb_metadata.py
+
