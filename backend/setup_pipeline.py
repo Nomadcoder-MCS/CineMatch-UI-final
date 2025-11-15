@@ -199,9 +199,9 @@ def main():
     
     print()
     print("Documentation:")
-    print("  • DATA_PIPELINE.md - Full pipeline docs")
-    print("  • MIGRATION_GUIDE.md - Migration from toy dataset")
-    print("  • backend/README.md - API documentation")
+    print("  • Documentation/Data/DATA_PIPELINE.md - Full pipeline docs")
+    print("  • Documentation/Backend/MIGRATION_GUIDE.md - Migration from toy dataset")
+    print("  • Documentation/Backend/backend_README.md - API documentation")
     print()
     
     start_now = input("Start server now? (y/n): ").strip().lower() == 'y'
