@@ -1,7 +1,20 @@
 /**
- * CineMatch ML Backend API Client
+ * ⚠️  **DEPRECATED** - DO NOT USE THIS FILE
  * 
- * Connects React UI to Python FastAPI backend for ML-powered recommendations.
+ * This file is kept for historical reference only.
+ * 
+ * Use `src/api/client.js` instead, which:
+ * - Automatically attaches X-User-Id header from AuthContext
+ * - Works with the modern GET /api/recommendations endpoint
+ * - Properly handles authentication
+ * 
+ * This file was used before auth was implemented and has several issues:
+ * - Uses legacy POST /api/recommendations endpoint
+ * - Has hard-coded "default_user" fallback
+ * - Doesn't integrate with AuthContext
+ * - Bypasses the auth system
+ * 
+ * @deprecated Use src/api/client.js instead
  */
 
 const BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';

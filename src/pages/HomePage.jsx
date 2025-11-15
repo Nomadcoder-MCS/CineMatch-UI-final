@@ -8,9 +8,14 @@ import api from '../api/client';
 
 /**
  * HomePage - Main recommendations dashboard for signed-in users
+ * 
+ * Fixes race condition by waiting for authReady before fetching recommendations:
+ * - Waits for auth hydration from localStorage to complete
+ * - Only fetches recommendations when user is available
+ * - Prevents API calls before X-User-Id header can be attached
  */
 export default function HomePage() {
-  const { user } = useAuth();
+  const { user, authReady } = useAuth();
   const navigate = useNavigate();
   const [movies, setMovies] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -24,25 +29,24 @@ export default function HomePage() {
     sort: false,
   });
 
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (!user) {
-      navigate('/');
-    }
-  }, [user, navigate]);
-
-  useEffect(() => {
-    if (user) {
-      loadRecommendations();
-    }
-  }, [user]);
-
+  /**
+   * Load recommendations from backend
+   * Only called when authReady is true and user exists
+   */
   const loadRecommendations = async () => {
+    // Guard: Don't fetch if user is not available
+    if (!user || !user.id) {
+      console.warn('Cannot load recommendations: user not available');
+      setError('User not authenticated');
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
-      // Call new GET /api/recommendations endpoint
-      // This automatically loads user preferences and feedback from database
+      // Call GET /api/recommendations endpoint
+      // API client automatically attaches X-User-Id header from localStorage
       const response = await api.get('/api/recommendations?limit=20');
       setMovies(response.recommendations || []);
       console.log(`✓ Loaded ${response.count} personalized recommendations`);
@@ -54,6 +58,36 @@ export default function HomePage() {
       setLoading(false);
     }
   };
+
+  // Redirect if not authenticated (after auth is ready)
+  useEffect(() => {
+    if (authReady && !user) {
+      navigate('/');
+    }
+  }, [authReady, user, navigate]);
+
+  // Fetch recommendations when auth is ready and user is available
+  // This effect runs:
+  // 1. Once after authReady becomes true (auth hydration complete)
+  // 2. When user.id changes (e.g., after sign-in or sign-out)
+  useEffect(() => {
+    // Wait until auth hydration is complete
+    if (!authReady) {
+      return;
+    }
+
+    // If no user, ProtectedRoute should handle redirect
+    // But we also check here to avoid unnecessary API calls
+    if (!user || !user.id) {
+      setLoading(false);
+      return;
+    }
+
+    // Auth is ready and user exists - safe to fetch recommendations
+    loadRecommendations();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authReady, user?.id]); // Depend on user.id to refetch if user changes
+  // Note: loadRecommendations is intentionally not in deps - it's stable and checks user internally
 
   const handleMovieRemoved = (movieId) => {
     // Remove movie from local state after feedback
@@ -69,8 +103,16 @@ export default function HomePage() {
     console.log(`Toggled filter: ${filterName}`);
   };
 
-  if (!user) {
-    return null; // Will redirect in useEffect
+  // Show loading while auth is initializing or while user is being checked
+  if (!authReady || !user) {
+    return (
+      <div className="min-h-screen bg-brand-bg flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-4xl mb-4">🎬</div>
+          <p className="text-brand-text-body">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   const firstName = user.name?.split(' ')[0] || 'there';

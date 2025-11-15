@@ -45,6 +45,11 @@ def load_movies(data_path: str = "data/movies_merged.csv") -> pd.DataFrame:
     if missing:
         raise ValueError(f"Missing required columns: {missing}")
     
+    # poster_path is optional but recommended
+    if 'poster_path' not in df.columns:
+        print("⚠️  Warning: poster_path column not found. Posters will not be available.")
+        df['poster_path'] = None
+    
     print(f"✓ Loaded {len(df):,} movies")
     return df
 
@@ -138,8 +143,14 @@ def save_artifacts(
     with open(output_path / "numeric_scaler.pkl", 'wb') as f:
         pickle.dump(numeric_scaler, f)
     
-    # Save movie metadata
-    movies_meta = movies_df[['movieId', 'title', 'year', 'runtime', 'overview', 'genres', 'services']].to_dict('records')
+    # Save movie metadata (include poster_path if available)
+    meta_columns = ['movieId', 'title', 'year', 'runtime', 'overview', 'genres', 'services']
+    if 'poster_path' in movies_df.columns:
+        meta_columns.append('poster_path')
+    if 'backdrop_path' in movies_df.columns:
+        meta_columns.append('backdrop_path')
+    
+    movies_meta = movies_df[meta_columns].to_dict('records')
     
     with open(output_path / "movies_meta.json", 'w') as f:
         json.dump(movies_meta, f, indent=2)

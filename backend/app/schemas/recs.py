@@ -3,8 +3,14 @@ from typing import Optional
 
 
 class UserPreferences(BaseModel):
-    """User preferences for generating recommendations"""
-    user_id: Optional[str] = "default_user"
+    """
+    User preferences for generating recommendations
+    
+    NOTE: This schema is used by the legacy POST /api/recommendations endpoint.
+    The modern GET /api/recommendations endpoint does NOT use this schema -
+    it loads preferences directly from the database using the X-User-Id header.
+    """
+    user_id: Optional[str] = None  # Changed from "default_user" - should come from client
     liked_movie_ids: list[int] = Field(default_factory=list)
     disliked_movie_ids: list[int] = Field(default_factory=list)
     preferred_genres: list[str] = Field(default_factory=list)

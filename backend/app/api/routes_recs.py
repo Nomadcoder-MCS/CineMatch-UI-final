@@ -33,8 +33,40 @@ async def get_recommendations_for_user(
     """
     Get personalized movie recommendations for the current user
     
-    Loads user preferences and feedback from database and generates
-    recommendations using the ML recommender.
+    **How per-user recommendations work:**
+    
+    1. **Authentication:**
+       - Requires X-User-Id header (via get_current_user dependency)
+       - Returns 401 if user not found
+       - No default user fallback
+    
+    2. **Load User Preferences (from database):**
+       - preferred_genres: e.g., ["action", "sci-fi"]
+       - services: e.g., ["Netflix", "Hulu"]
+       - runtime_min, runtime_max: e.g., 90-150 minutes
+    
+    3. **Load User Feedback (from database):**
+       - liked_movie_ids: Movies user gave thumbs up
+       - disliked_movie_ids: Movies user gave thumbs down
+       - not_interested_ids: Movies user marked "not interested" (hard exclusion)
+    
+    4. **Build User Profile (in ML recommender):**
+       - Strategy 1: Average feature vectors of liked movies
+       - Strategy 2: Synthetic profile from preferred genres
+       - Strategy 3: Cold-start fallback (average of all movies)
+    
+    5. **Apply Filters:**
+       - Exclude not_interested_ids (NEVER show these)
+       - Exclude already liked/disliked (avoid duplicates)
+       - Filter by genres, services, runtime (from preferences)
+    
+    6. **Return Recommendations:**
+       - Ranked by cosine similarity to user profile
+       - Includes overview, poster_url, score, explanation
+    
+    **No hard-coded values are used.** All data comes from the database.
+    If a user has no preferences or feedback, the recommender uses a
+    cold-start fallback (documented in recommender.py).
     """
     try:
         recommender = get_recommender()
@@ -56,9 +88,14 @@ async def get_recommendations_for_user(
             runtime_min = db_prefs.runtime_min or 80
             runtime_max = db_prefs.runtime_max or 180
         
-        # Load user feedback (likes and dislikes)
+        # Load user feedback (likes, dislikes, and not_interested)
+        # Semantics:
+        # - likes: Positive preference, used to build user profile
+        # - dislikes: Negative signal, can down-weight but not hard exclude
+        # - not_interested: Hard exclusion - these movies should NEVER appear
         liked_movie_ids = []
         disliked_movie_ids = []
+        not_interested_ids = []
         
         feedback_records = db.query(UserFeedback).filter(
             UserFeedback.user_id == current_user.id
@@ -69,6 +106,8 @@ async def get_recommendations_for_user(
                 liked_movie_ids.append(feedback.movie_id)
             elif feedback.signal == "dislike":
                 disliked_movie_ids.append(feedback.movie_id)
+            elif feedback.signal == "not_interested":
+                not_interested_ids.append(feedback.movie_id)
         
         print(f"\n{'='*60}")
         print(f"Building recommendations for user: {current_user.name} (ID: {current_user.id})")
@@ -77,6 +116,7 @@ async def get_recommendations_for_user(
         print(f"  Runtime: {runtime_min}-{runtime_max} min")
         print(f"  Liked movies: {len(liked_movie_ids)}")
         print(f"  Disliked movies: {len(disliked_movie_ids)}")
+        print(f"  Not interested (excluded): {len(not_interested_ids)}")
         print(f"{'='*60}")
         
         # Build ML preferences object
@@ -84,6 +124,7 @@ async def get_recommendations_for_user(
             user_id=str(current_user.id),
             liked_movie_ids=liked_movie_ids,
             disliked_movie_ids=disliked_movie_ids,
+            not_interested_ids=not_interested_ids,  # Hard exclusion set
             preferred_genres=preferred_genres,
             services=services,
             runtime_min=runtime_min,
@@ -106,16 +147,32 @@ async def get_recommendations_for_user(
         raise HTTPException(status_code=500, detail=f"Error generating recommendations: {str(e)}")
 
 
-@router.post("/api/recommendations", response_model=RecommendationsResponse)
-async def get_recommendations(preferences: UserPreferences):
+@router.post("/api/recommendations", response_model=RecommendationsResponse, deprecated=True)
+async def get_recommendations_legacy(preferences: UserPreferences):
     """
-    Get personalized movie recommendations
+    **DEPRECATED:** Legacy endpoint for recommendations
     
-    Accepts user preferences and returns ranked list of movie recommendations
-    using content-based filtering with TF-IDF + genre features.
+    ⚠️  Use `GET /api/recommendations` instead (requires X-User-Id header)
+    
+    This endpoint is kept for backward compatibility but should not be used.
+    It accepts user preferences directly in the request body, which bypasses
+    the auth system and doesn't load preferences from the database.
+    
+    The modern GET endpoint:
+    - Requires authentication (X-User-Id header)
+    - Loads preferences from database
+    - Loads user feedback from database
+    - Provides fully personalized recommendations
     """
     try:
         recommender = get_recommender()
+        
+        # Validate user_id is provided (no default fallback)
+        if not preferences.user_id:
+            raise HTTPException(
+                status_code=400,
+                detail="user_id is required. Use GET /api/recommendations with X-User-Id header instead."
+            )
         
         # Convert Pydantic model to dataclass for ML module
         ml_prefs = MLUserPrefs(
@@ -137,7 +194,7 @@ async def get_recommendations(preferences: UserPreferences):
         return RecommendationsResponse(
             recommendations=recommendations,
             count=len(recommendations),
-            user_id=preferences.user_id or "default_user"
+            user_id=preferences.user_id
         )
     
     except Exception as e:

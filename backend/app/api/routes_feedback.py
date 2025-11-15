@@ -2,6 +2,7 @@
 User feedback endpoints (like/dislike/not_interested)
 """
 
+from datetime import datetime
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.db import get_db
@@ -19,13 +20,17 @@ def record_feedback(
     db: Session = Depends(get_db)
 ):
     """
-    Record user feedback on a movie
+    Record user feedback on a movie (upsert)
     
-    Signals: "like", "dislike", "not_interested"
+    Feedback semantics:
+    - "like": Positive preference - used to build user profile and find similar movies
+    - "dislike": Negative signal - can down-weight but not hard exclude
+    - "not_interested": Hard exclusion - movie will NEVER appear in recommendations again
     
-    This satisfies TODOs like:
-    - // TODO: Implement markNotInterested endpoint in backend
-    - // TODO: Implement like/dislike endpoints
+    If feedback already exists for this user+movie, updates the signal and created_at.
+    Otherwise, creates a new feedback record.
+    
+    Uses X-User-Id header (via get_current_user dependency) to identify the user.
     """
     # Check if feedback already exists for this user+movie
     existing = db.query(UserFeedback).filter(
@@ -34,8 +39,9 @@ def record_feedback(
     ).first()
     
     if existing:
-        # Update existing feedback
+        # Update existing feedback (user changed their mind)
         existing.signal = feedback.signal
+        existing.created_at = datetime.utcnow()  # Update timestamp
         db.commit()
         db.refresh(existing)
         return FeedbackResponse.from_orm(existing)

@@ -50,10 +50,12 @@ def parse_record(j):
         "release_date": j.get("release_date"),
         "runtime": j.get("runtime"),
         "popularity": j.get("popularity"),
-        "vote_count": j.get("vote_count"),        # <-- add
-        "vote_average": j.get("vote_average"),    # <-- add
+        "vote_count": j.get("vote_count"),
+        "vote_average": j.get("vote_average"),
         "genres": genres,
         "overview": j.get("overview"),
+        "poster_path": j.get("poster_path"),      # <-- add poster path
+        "backdrop_path": j.get("backdrop_path"),  # <-- optional backdrop
         "keywords": keywords,
         "cast_top": cast_top,
         "director": director

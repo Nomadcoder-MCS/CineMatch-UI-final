@@ -2,26 +2,37 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import TopNavSignedOut from '../components/TopNavSignedOut';
+import SignInModal from '../components/SignInModal';
 import TagChip from '../components/TagChip';
 
 /**
  * LandingPage - Marketing page for signed-out users
+ * 
+ * Features:
+ * - "Get started" form: Collects name + email, calls signUp()
+ * - "Sign in" button: Opens SignInModal for email-only sign-in
+ * - Auto-redirects to /home if user is already signed in
  */
 export default function LandingPage() {
   const navigate = useNavigate();
-  const { user, identifyUser } = useAuth();
+  const { user, signUp } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showSignInModal, setShowSignInModal] = useState(false);
 
-  // Redirect to home if already signed in
+  // Redirect to home if already signed in (from localStorage)
   useEffect(() => {
     if (user) {
       navigate('/home');
     }
   }, [user, navigate]);
 
+  /**
+   * Handle "Get started" form submission
+   * Creates new user or returns existing user
+   */
   const handleGetStarted = async (e) => {
     e.preventDefault();
     setError('');
@@ -42,20 +53,44 @@ export default function LandingPage() {
 
     setIsLoading(true);
     try {
-      await identifyUser(name.trim(), email.trim());
-      // Navigation happens automatically after user is set
+      // Call signUp - creates user or returns existing
+      await signUp(name.trim(), email.trim());
+      // Navigation happens automatically after user is set (via useEffect)
       navigate('/home');
     } catch (error) {
-      console.error('Failed to identify user:', error);
-      setError('Could not connect to server. Please try again.');
+      console.error('Failed to sign up:', error);
+      setError(error.message || 'Could not connect to server. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  /**
+   * Handle "Sign in" button click
+   * Opens the sign-in modal
+   */
+  const handleSignInClick = () => {
+    setShowSignInModal(true);
+  };
+
+  /**
+   * Handle successful sign-in from modal
+   * Navigates to home page
+   */
+  const handleSignInSuccess = () => {
+    navigate('/home');
+  };
+
   return (
     <div className="min-h-screen bg-brand-bg">
-      <TopNavSignedOut />
+      <TopNavSignedOut onSignInClick={handleSignInClick} />
+      
+      {/* Sign-in modal */}
+      <SignInModal 
+        isOpen={showSignInModal}
+        onClose={() => setShowSignInModal(false)}
+        onSuccess={handleSignInSuccess}
+      />
 
       {/* Hero Section */}
       <section className="max-w-7xl mx-auto px-6 py-16">

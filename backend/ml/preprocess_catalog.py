@@ -97,8 +97,8 @@ def merge_with_tmdb(df, tmdb):
     keep_cols = [
         "movieId", "tmdbId", "imdbId", "title", "year", 
         "genres", "overview", "runtime", "popularity",
-        "vote_count", "vote_average", "keywords", 
-        "cast_top", "director"
+        "vote_count", "vote_average", "poster_path", "backdrop_path",
+        "keywords", "cast_top", "director"
     ]
     
     # Only keep columns that exist

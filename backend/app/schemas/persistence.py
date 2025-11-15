@@ -12,9 +12,14 @@ from datetime import datetime
 # ============================================================================
 
 class UserIdentify(BaseModel):
-    """Request to identify/create a user"""
-    name: str = Field(..., min_length=1, max_length=100)
+    """
+    Request to identify/create a user
+    
+    - For "Get started" (sign up): name and email are provided
+    - For "Sign in": only email is provided (name is optional)
+    """
     email: EmailStr
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
 
 
 class UserResponse(BaseModel):

@@ -6,6 +6,7 @@ based on user preferences and viewing history.
 """
 
 import numpy as np
+import pandas as pd
 from scipy.sparse import load_npz, csr_matrix
 from sklearn.metrics.pairwise import cosine_similarity
 import pickle
@@ -17,10 +18,18 @@ from dataclasses import dataclass
 
 @dataclass
 class UserPreferences:
-    """User preferences for recommendations"""
+    """
+    User preferences for recommendations
+    
+    Semantics:
+    - liked_movie_ids: Positive preference - used to build user profile
+    - disliked_movie_ids: Negative signal - can down-weight but not hard exclude
+    - not_interested_ids: Hard exclusion - these movies should NEVER appear in recommendations
+    """
     user_id: Optional[str] = None
     liked_movie_ids: list[int] = None
     disliked_movie_ids: list[int] = None
+    not_interested_ids: list[int] = None  # Hard exclusion set
     preferred_genres: list[str] = None
     services: list[str] = None
     runtime_min: Optional[int] = None
@@ -30,12 +39,17 @@ class UserPreferences:
         # Initialize empty lists if None
         self.liked_movie_ids = self.liked_movie_ids or []
         self.disliked_movie_ids = self.disliked_movie_ids or []
+        self.not_interested_ids = self.not_interested_ids or []  # Hard exclusion
         self.preferred_genres = self.preferred_genres or []
         self.services = self.services or []
 
 
 class CineMatchRecommender:
     """Content-based movie recommender using TF-IDF + genres + cosine similarity"""
+    
+    # TMDb image base URL
+    TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/"
+    POSTER_SIZE = "w500"  # Options: w92, w154, w185, w342, w500, w780, original
     
     def __init__(self, artifacts_dir: str = "ml/artifacts"):
         """Load pre-trained artifacts"""
@@ -73,10 +87,27 @@ class CineMatchRecommender:
         """
         Build user profile vector from preferences
         
-        Strategy:
-        1. If user has liked movies, average their feature vectors
-        2. If no likes, build profile from preferred genres/services
-        3. Boost profile with explicit preferences
+        **How per-user profiles are built (NO hard-coded data):**
+        
+        Strategy (in order of preference):
+        1. **Collaborative signal** (if user has liked movies):
+           - Average feature vectors of liked movies
+           - This captures user's actual taste from their feedback
+           - Example: User liked "Inception" and "Matrix" → profile is sci-fi/action
+        
+        2. **Explicit preferences** (if no likes but has preferred genres):
+           - Build synthetic profile from preferred genres
+           - Boost genre features in profile vector
+           - Example: User selected "Action" and "Comedy" → profile has those genres
+        
+        3. **Cold-start fallback** (if no likes and no preferences):
+           - Use average of all movies in catalog
+           - This is NOT a "demo behavior" - it's proper cold-start handling
+           - Provides baseline recommendations until user gives feedback
+        
+        The cold-start fallback is intentional and ensures new users
+        still get recommendations. As users like movies or set preferences,
+        the profile becomes increasingly personalized.
         """
         user_profile = None
         
@@ -124,16 +155,29 @@ class CineMatchRecommender:
         prefs: UserPreferences,
         candidate_indices: list[int]
     ) -> list[int]:
-        """Apply runtime, genre, and service filters to candidates"""
+        """
+        Apply filters to candidate movies
+        
+        Filter order:
+        1. Hard exclusions (not_interested_ids) - NEVER show these
+        2. Already liked/disliked - avoid duplicates
+        3. Runtime, genre, service filters - user preferences
+        """
         filtered = []
         
         for idx in candidate_indices:
             movie = self.movies_meta[idx]
             movie_id = movie['movieId']
             
-            # Exclude already liked/disliked
+            # HARD EXCLUSION: "Not interested" movies should NEVER appear
+            if movie_id in prefs.not_interested_ids:
+                continue
+            
+            # Exclude already liked (to avoid duplicates)
             if movie_id in prefs.liked_movie_ids:
                 continue
+            
+            # Exclude disliked (can optionally down-weight instead, but for now exclude)
             if movie_id in prefs.disliked_movie_ids:
                 continue
             
@@ -224,6 +268,7 @@ class CineMatchRecommender:
         recommendations = []
         for idx in final_indices:
             movie = self.movies_meta[idx]
+            poster_path = movie.get('poster_path')
             
             rec = {
                 "movie_id": movie['movieId'],
@@ -233,6 +278,8 @@ class CineMatchRecommender:
                 "overview": movie['overview'],
                 "genres": movie['genres'].split('|'),
                 "services": movie['services'].split('|'),
+                "poster_url": self.build_poster_url(poster_path),
+                "poster_path": poster_path,  # Keep raw path for debugging
                 "score": float(similarities[idx]),
                 "explanation": self.generate_explanation(movie, prefs)
             }
@@ -240,10 +287,32 @@ class CineMatchRecommender:
         
         return recommendations
     
+    def build_poster_url(self, poster_path: Optional[str]) -> Optional[str]:
+        """
+        Build full TMDb poster URL from poster_path
+        
+        Args:
+            poster_path: TMDb poster path (e.g., "/abc123.jpg") or None/NaN
+        
+        Returns:
+            Full URL (e.g., "https://image.tmdb.org/t/p/w500/abc123.jpg") or None
+        """
+        # Handle None, NaN, empty string, or the string "nan" (from JSON serialization)
+        if not poster_path or pd.isna(poster_path) or str(poster_path).lower() == 'nan' or str(poster_path).strip() == '':
+            return None
+        
+        # poster_path should start with '/', but handle cases where it doesn't
+        poster_path_str = str(poster_path).strip()
+        if not poster_path_str.startswith('/'):
+            poster_path_str = '/' + poster_path_str
+        
+        return f"{self.TMDB_IMAGE_BASE}{self.POSTER_SIZE}{poster_path_str}"
+    
     def get_movie_by_id(self, movie_id: int) -> Optional[dict]:
         """Get movie metadata by ID"""
         for movie in self.movies_meta:
             if movie['movieId'] == movie_id:
+                poster_path = movie.get('poster_path')
                 return {
                     "movie_id": movie['movieId'],
                     "title": movie['title'],
@@ -251,7 +320,9 @@ class CineMatchRecommender:
                     "runtime": movie['runtime'],
                     "overview": movie['overview'],
                     "genres": movie['genres'].split('|'),
-                    "services": movie['services'].split('|')
+                    "services": movie['services'].split('|'),
+                    "poster_url": self.build_poster_url(poster_path),
+                    "poster_path": poster_path
                 }
         return None
     
