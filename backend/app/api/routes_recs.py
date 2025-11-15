@@ -9,8 +9,20 @@ from app.models import User, UserPreferences as DBUserPreferences, UserFeedback
 from app.deps import get_current_user
 from app.schemas.recs import UserPreferences, RecommendationsResponse, Recommendation
 from ml.recommender import get_recommender, UserPreferences as MLUserPrefs
+from enum import Enum
+from typing import Optional
 
 router = APIRouter()
+
+
+class RecMode(str, Enum):
+    """Recommendation mode"""
+    because_liked = "because_liked"
+    trending = "trending"
+    genre = "genre"
+    service = "service"
+    year = "year"
+    runtime = "runtime"
 
 
 @router.get("/health")
@@ -27,6 +39,11 @@ async def health_check():
 @router.get("/api/recommendations")
 async def get_recommendations_for_user(
     limit: int = Query(default=20, ge=1, le=100),
+    mode: RecMode = Query(default=RecMode.because_liked),
+    genre: Optional[str] = Query(default=None),
+    service: Optional[str] = Query(default=None),
+    year_bucket: Optional[str] = Query(default=None),
+    runtime_bucket: Optional[str] = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -111,6 +128,15 @@ async def get_recommendations_for_user(
         
         print(f"\n{'='*60}")
         print(f"Building recommendations for user: {current_user.name} (ID: {current_user.id})")
+        print(f"  Mode: {mode}")
+        if mode == RecMode.genre and genre:
+            print(f"  Filtering by genre: {genre}")
+        if mode == RecMode.service and service:
+            print(f"  Filtering by service: {service}")
+        if mode == RecMode.year and year_bucket:
+            print(f"  Filtering by year bucket: {year_bucket}")
+        if mode == RecMode.runtime and runtime_bucket:
+            print(f"  Filtering by runtime bucket: {runtime_bucket}")
         print(f"  Preferred genres: {preferred_genres}")
         print(f"  Services: {services}")
         print(f"  Runtime: {runtime_min}-{runtime_max} min")
@@ -131,15 +157,24 @@ async def get_recommendations_for_user(
             runtime_max=runtime_max
         )
         
-        # Get recommendations from ML model
-        recs = recommender.recommend(ml_prefs, top_k=limit)
+        # Get recommendations from ML model with mode-specific params
+        recs = recommender.recommend(
+            ml_prefs, 
+            top_k=limit,
+            mode=mode.value,
+            filter_genre=genre,
+            filter_service=service,
+            filter_year_bucket=year_bucket,
+            filter_runtime_bucket=runtime_bucket
+        )
         
-        print(f"✓ Generated {len(recs)} personalized recommendations")
+        print(f"✓ Generated {len(recs)} personalized recommendations (mode: {mode})")
         
         return {
             "recommendations": recs,
             "count": len(recs),
-            "user_id": current_user.id
+            "user_id": current_user.id,
+            "mode": mode.value
         }
     
     except Exception as e:

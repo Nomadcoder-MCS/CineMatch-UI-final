@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import TagChip from './TagChip';
 import api from '../api/client';
 
@@ -11,8 +10,7 @@ import api from '../api/client';
  * - 👎 (dislike): Negative signal - can down-weight but not hard exclude
  * - "Not interested": Hard exclusion - movie will NEVER appear in recommendations again
  */
-export default function MovieCard({ movie, onRemove }) {
-  const navigate = useNavigate();
+export default function MovieCard({ movie, onRemove, onShowWhyThis, onAddToWatchlistSuccess }) {
   const [feedback, setFeedback] = useState(null); // 'like' | 'dislike' | null
 
   /**
@@ -85,8 +83,10 @@ export default function MovieCard({ movie, onRemove }) {
         title: movie.title,
         service: movie.services?.[0] // First service if available
       });
-      alert(`Added "${movie.title}" to your watchlist!`);
-      navigate('/watchlist');
+      // Call success handler to show modal instead of alert
+      if (onAddToWatchlistSuccess) {
+        onAddToWatchlistSuccess(movie.title);
+      }
     } catch (error) {
       console.error('Error adding to watchlist:', error);
       alert('Could not add to watchlist. Make sure you are signed in.');
@@ -97,7 +97,11 @@ export default function MovieCard({ movie, onRemove }) {
     // Use ML-generated explanation if available
     const explanation = movie.explanation || 
       `Why we recommended "${movie.title}":\n\n• Matches your preferred genres\n• High rating from users with similar taste\n• Available on your connected streaming services`;
-    alert(explanation);
+    
+    // Call parent handler to show modal instead of alert
+    if (onShowWhyThis) {
+      onShowWhyThis(explanation);
+    }
   };
 
   // Poster URL - use poster_url from API, fallback to posterUrl for backward compatibility

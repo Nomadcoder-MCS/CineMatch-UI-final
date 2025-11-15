@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import TopNavSignedIn from '../components/TopNavSignedIn';
 import FilterChip from '../components/FilterChip';
 import MovieCard from '../components/MovieCard';
+import Modal from '../components/Modal';
 import api from '../api/client';
 
 /**
@@ -20,14 +21,49 @@ export default function HomePage() {
   const [movies, setMovies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeContext, setActiveContext] = useState('liked');
-  const [activeFilters, setActiveFilters] = useState({
-    genre: false,
-    service: false,
-    year: false,
-    runtime: false,
-    sort: false,
+  
+  // Mode and filter state
+  const [mode, setMode] = useState('because_liked');
+  const [selectedGenre, setSelectedGenre] = useState(null);
+  const [selectedService, setSelectedService] = useState(null);
+  const [selectedYearBucket, setSelectedYearBucket] = useState('recent');
+  const [selectedRuntimeBucket, setSelectedRuntimeBucket] = useState('medium');
+  
+  // User preferences (loaded from API)
+  const [preferences, setPreferences] = useState({
+    preferred_genres: [],
+    services: []
   });
+
+  // Modal state for "Why this?" explanations
+  const [whyModalOpen, setWhyModalOpen] = useState(false);
+  const [whyText, setWhyText] = useState(null);
+
+  // Modal state for "Added to watchlist" success
+  const [watchlistModalOpen, setWatchlistModalOpen] = useState(false);
+  const [watchlistModalTitle, setWatchlistModalTitle] = useState(null);
+
+  /**
+   * Load user preferences from backend
+   */
+  const loadPreferences = async () => {
+    if (!user || !user.id) return;
+    
+    try {
+      const prefs = await api.get('/api/preferences/me');
+      setPreferences(prefs);
+      
+      // Initialize genre/service filters with user's first preference
+      if (prefs.preferred_genres && prefs.preferred_genres.length > 0 && !selectedGenre) {
+        setSelectedGenre(prefs.preferred_genres[0]);
+      }
+      if (prefs.services && prefs.services.length > 0 && !selectedService) {
+        setSelectedService(prefs.services[0]);
+      }
+    } catch (error) {
+      console.error('Error loading preferences:', error);
+    }
+  };
 
   /**
    * Load recommendations from backend
@@ -45,11 +81,29 @@ export default function HomePage() {
     setLoading(true);
     setError(null);
     try {
+      // Build query params based on mode and filters
+      const params = new URLSearchParams();
+      params.set('limit', '20');
+      params.set('mode', mode);
+      
+      if (mode === 'genre' && selectedGenre) {
+        params.set('genre', selectedGenre);
+      }
+      if (mode === 'service' && selectedService) {
+        params.set('service', selectedService);
+      }
+      if (mode === 'year') {
+        params.set('year_bucket', selectedYearBucket);
+      }
+      if (mode === 'runtime') {
+        params.set('runtime_bucket', selectedRuntimeBucket);
+      }
+      
       // Call GET /api/recommendations endpoint
       // API client automatically attaches X-User-Id header from localStorage
-      const response = await api.get('/api/recommendations?limit=20');
+      const response = await api.get(`/api/recommendations?${params.toString()}`);
       setMovies(response.recommendations || []);
-      console.log(`✓ Loaded ${response.count} personalized recommendations`);
+      console.log(`✓ Loaded ${response.count} personalized recommendations (mode: ${mode})`);
     } catch (error) {
       console.error('Error loading recommendations:', error);
       setError('Could not load recommendations. Please try again.');
@@ -66,10 +120,15 @@ export default function HomePage() {
     }
   }, [authReady, user, navigate]);
 
-  // Fetch recommendations when auth is ready and user is available
-  // This effect runs:
-  // 1. Once after authReady becomes true (auth hydration complete)
-  // 2. When user.id changes (e.g., after sign-in or sign-out)
+  // Load preferences when user is available
+  useEffect(() => {
+    if (authReady && user && user.id) {
+      loadPreferences();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authReady, user?.id]);
+
+  // Fetch recommendations when auth is ready, user is available, or filters change
   useEffect(() => {
     // Wait until auth hydration is complete
     if (!authReady) {
@@ -86,22 +145,65 @@ export default function HomePage() {
     // Auth is ready and user exists - safe to fetch recommendations
     loadRecommendations();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authReady, user?.id]); // Depend on user.id to refetch if user changes
-  // Note: loadRecommendations is intentionally not in deps - it's stable and checks user internally
+  }, [authReady, user?.id, mode, selectedGenre, selectedService, selectedYearBucket, selectedRuntimeBucket]);
 
   const handleMovieRemoved = (movieId) => {
     // Remove movie from local state after feedback
     setMovies(prev => prev.filter(m => m.movie_id !== movieId));
   };
 
-  const toggleFilter = (filterName) => {
-    setActiveFilters(prev => ({
-      ...prev,
-      [filterName]: !prev[filterName],
-    }));
-    // In production, this would trigger a new API call with filter params
-    console.log(`Toggled filter: ${filterName}`);
+  const handleShowWhyThis = (explanation) => {
+    setWhyText(explanation);
+    setWhyModalOpen(true);
   };
+
+  const handleCloseWhyModal = () => {
+    setWhyModalOpen(false);
+    setWhyText(null);
+  };
+
+  const openWatchlistModal = (movieTitle) => {
+    setWatchlistModalTitle(movieTitle);
+    setWatchlistModalOpen(true);
+  };
+
+  const closeWatchlistModal = () => {
+    setWatchlistModalOpen(false);
+    setWatchlistModalTitle(null);
+  };
+
+  const goToWatchlist = () => {
+    setWatchlistModalOpen(false);
+    setWatchlistModalTitle(null);
+    navigate('/watchlist');
+  };
+
+  const handleModeChange = (newMode) => {
+    setMode(newMode);
+    
+    // Initialize filters with user preferences when switching to certain modes
+    if (newMode === 'genre' && !selectedGenre && preferences.preferred_genres.length > 0) {
+      setSelectedGenre(preferences.preferred_genres[0]);
+    }
+    if (newMode === 'service' && !selectedService && preferences.services.length > 0) {
+      setSelectedService(preferences.services[0]);
+    }
+  };
+
+  // Year and runtime bucket options
+  const yearBuckets = [
+    { value: 'recent', label: '2018+' },
+    { value: '2010s', label: '2010s' },
+    { value: '2000s', label: '2000s' },
+    { value: '90s', label: '90s' },
+    { value: 'classic', label: 'Pre-1990' }
+  ];
+
+  const runtimeBuckets = [
+    { value: 'short', label: '<90 min' },
+    { value: 'medium', label: '90-150 min' },
+    { value: 'long', label: '>150 min' }
+  ];
 
   // Show loading while auth is initializing or while user is being checked
   if (!authReady || !user) {
@@ -135,52 +237,126 @@ export default function HomePage() {
           </p>
         </div>
 
-        {/* Context chips */}
+        {/* Mode selection */}
         <div className="mb-6">
           <div className="flex flex-wrap gap-3">
             <FilterChip
               label="Because you liked…"
-              active={activeContext === 'liked'}
-              onClick={() => setActiveContext('liked')}
+              active={mode === 'because_liked'}
+              onClick={() => handleModeChange('because_liked')}
             />
             <FilterChip
               label="Trending for you"
-              active={activeContext === 'trending'}
-              onClick={() => setActiveContext('trending')}
+              active={mode === 'trending'}
+              onClick={() => handleModeChange('trending')}
+            />
+            <FilterChip
+              label="Genre"
+              active={mode === 'genre'}
+              onClick={() => handleModeChange('genre')}
+            />
+            <FilterChip
+              label="Service"
+              active={mode === 'service'}
+              onClick={() => handleModeChange('service')}
+            />
+            <FilterChip
+              label="Year"
+              active={mode === 'year'}
+              onClick={() => handleModeChange('year')}
+            />
+            <FilterChip
+              label="Runtime"
+              active={mode === 'runtime'}
+              onClick={() => handleModeChange('runtime')}
             />
           </div>
         </div>
 
-        {/* Filter row */}
-        <div className="mb-8">
-          <div className="flex flex-wrap gap-3">
-            <FilterChip
-              label="Genre"
-              active={activeFilters.genre}
-              onClick={() => toggleFilter('genre')}
-            />
-            <FilterChip
-              label="Service"
-              active={activeFilters.service}
-              onClick={() => toggleFilter('service')}
-            />
-            <FilterChip
-              label="Year"
-              active={activeFilters.year}
-              onClick={() => toggleFilter('year')}
-            />
-            <FilterChip
-              label="Runtime"
-              active={activeFilters.runtime}
-              onClick={() => toggleFilter('runtime')}
-            />
-            <FilterChip
-              label="Sort"
-              active={activeFilters.sort}
-              onClick={() => toggleFilter('sort')}
-            />
+        {/* Sub-filters based on mode */}
+        {mode === 'genre' && preferences.preferred_genres.length > 0 && (
+          <div className="mb-6">
+            <p className="text-sm text-brand-text-secondary mb-3">Select genre:</p>
+            <div className="flex flex-wrap gap-2">
+              {preferences.preferred_genres.map((genre) => (
+                <button
+                  key={genre}
+                  onClick={() => setSelectedGenre(genre)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    selectedGenre === genre
+                      ? 'bg-brand-purple text-white'
+                      : 'bg-white text-brand-text-body border border-brand-border hover:bg-brand-bg'
+                  }`}
+                >
+                  {genre}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
+
+        {mode === 'service' && preferences.services.length > 0 && (
+          <div className="mb-6">
+            <p className="text-sm text-brand-text-secondary mb-3">Select service:</p>
+            <div className="flex flex-wrap gap-2">
+              {preferences.services.map((service) => (
+                <button
+                  key={service}
+                  onClick={() => setSelectedService(service)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    selectedService === service
+                      ? 'bg-brand-purple text-white'
+                      : 'bg-white text-brand-text-body border border-brand-border hover:bg-brand-bg'
+                  }`}
+                >
+                  {service}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {mode === 'year' && (
+          <div className="mb-6">
+            <p className="text-sm text-brand-text-secondary mb-3">Select time period:</p>
+            <div className="flex flex-wrap gap-2">
+              {yearBuckets.map((bucket) => (
+                <button
+                  key={bucket.value}
+                  onClick={() => setSelectedYearBucket(bucket.value)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    selectedYearBucket === bucket.value
+                      ? 'bg-brand-purple text-white'
+                      : 'bg-white text-brand-text-body border border-brand-border hover:bg-brand-bg'
+                  }`}
+                >
+                  {bucket.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {mode === 'runtime' && (
+          <div className="mb-6">
+            <p className="text-sm text-brand-text-secondary mb-3">Select runtime:</p>
+            <div className="flex flex-wrap gap-2">
+              {runtimeBuckets.map((bucket) => (
+                <button
+                  key={bucket.value}
+                  onClick={() => setSelectedRuntimeBucket(bucket.value)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    selectedRuntimeBucket === bucket.value
+                      ? 'bg-brand-purple text-white'
+                      : 'bg-white text-brand-text-body border border-brand-border hover:bg-brand-bg'
+                  }`}
+                >
+                  {bucket.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Main content area */}
         <div className="bg-white rounded-2xl shadow-md px-8 py-8">
@@ -225,13 +401,73 @@ export default function HomePage() {
                     key={movie.movie_id} 
                     movie={movie} 
                     onRemove={() => handleMovieRemoved(movie.movie_id)}
+                    onShowWhyThis={handleShowWhyThis}
+                    onAddToWatchlistSuccess={openWatchlistModal}
                   />
                 ))}
+              </div>
+
+              {/* Update recommendations button - lets user refresh after giving feedback */}
+              <div className="mt-8 flex justify-center">
+                <button
+                  type="button"
+                  onClick={loadRecommendations}
+                  disabled={loading}
+                  className={`
+                    px-8 py-3 rounded-xl font-semibold text-base
+                    bg-brand-orange text-white
+                    hover:bg-[#e05d00]
+                    disabled:opacity-50 disabled:cursor-not-allowed
+                    shadow-md transition-all
+                  `}
+                >
+                  {loading ? 'Updating recommendations...' : 'Update recommendations'}
+                </button>
               </div>
             </>
           )}
         </div>
       </main>
+
+      {/* Why this? Modal */}
+      <Modal
+        open={whyModalOpen && !!whyText}
+        title="Why this recommendation?"
+        onClose={handleCloseWhyModal}
+      >
+        {whyText}
+      </Modal>
+
+      {/* Added to watchlist success Modal */}
+      <Modal
+        open={watchlistModalOpen && !!watchlistModalTitle}
+        title="Added to your watchlist"
+        onClose={closeWatchlistModal}
+        actions={
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={closeWatchlistModal}
+              className="px-6 py-2 rounded-lg text-sm font-medium border border-brand-border text-brand-text-body hover:bg-brand-bg transition-colors"
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              onClick={goToWatchlist}
+              className="px-6 py-2 rounded-lg text-sm font-medium bg-brand-orange text-white hover:bg-[#e05d00] transition-colors shadow-sm"
+            >
+              Go to Watchlist
+            </button>
+          </div>
+        }
+      >
+        <p>
+          {watchlistModalTitle
+            ? `"${watchlistModalTitle}" has been added to your watchlist.`
+            : 'This movie has been added to your watchlist.'}
+        </p>
+      </Modal>
     </div>
   );
 }

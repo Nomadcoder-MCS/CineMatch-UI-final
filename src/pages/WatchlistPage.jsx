@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopNavSignedIn from '../components/TopNavSignedIn';
 import WatchlistItem from '../components/WatchlistItem';
+import Modal from '../components/Modal';
 import api from '../api/client';
 
 /**
@@ -12,6 +13,10 @@ export default function WatchlistPage() {
   const [watchlist, setWatchlist] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
+
+  // Delete confirmation modal state
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [pendingDeleteItem, setPendingDeleteItem] = useState(null);
 
   useEffect(() => {
     loadWatchlist();
@@ -31,13 +36,36 @@ export default function WatchlistPage() {
     }
   };
 
-  const handleRemoveItem = async (movieId) => {
+  // Open delete confirmation modal (does NOT delete yet)
+  const handleRequestRemove = (item) => {
+    setPendingDeleteItem(item);
+    setDeleteModalOpen(true);
+  };
+
+  // Close delete confirmation modal without deleting
+  const closeDeleteModal = () => {
+    setDeleteModalOpen(false);
+    setPendingDeleteItem(null);
+  };
+
+  // Actually delete the item after user confirms
+  const handleConfirmRemove = async () => {
+    if (!pendingDeleteItem) return;
+
     try {
-      await api.delete(`/api/watchlist/${movieId}`);
-      setWatchlist(prev => prev.filter(item => item.movie_id !== movieId));
+      // Backend DELETE behavior unchanged - still calls same endpoint
+      await api.delete(`/api/watchlist/${pendingDeleteItem.movie_id}`);
+      
+      // Update local state: filter this item out of the list
+      setWatchlist(prev => 
+        prev.filter(item => item.movie_id !== pendingDeleteItem.movie_id)
+      );
     } catch (error) {
       console.error('Error removing from watchlist:', error);
+      // Optionally show error feedback (but no alert)
       alert('Failed to remove from watchlist');
+    } finally {
+      closeDeleteModal();
     }
   };
 
@@ -99,25 +127,6 @@ export default function WatchlistPage() {
           </div>
         </div>
 
-        {/* Action row */}
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex gap-3">
-            <button className="px-4 py-2 bg-white text-brand-text-body border border-brand-border rounded-lg text-sm font-medium hover:bg-brand-bg transition-colors">
-              Remove selected
-            </button>
-            <button className="px-4 py-2 bg-white text-brand-text-body border border-brand-border rounded-lg text-sm font-medium hover:bg-brand-bg transition-colors">
-              Mark watched
-            </button>
-          </div>
-          <div>
-            <select className="px-4 py-2 bg-white text-brand-text-body border border-brand-border rounded-lg text-sm font-medium hover:bg-brand-bg transition-colors cursor-pointer">
-              <option>Recently added</option>
-              <option>Title A-Z</option>
-              <option>Release year</option>
-            </select>
-          </div>
-        </div>
-
         {/* Main content area */}
         <div className="bg-white rounded-2xl shadow-md px-8 py-8">
           {loading ? (
@@ -131,7 +140,7 @@ export default function WatchlistPage() {
                   key={item.id}
                   item={item}
                   onUpdate={loadWatchlist}
-                  onRemove={handleRemoveItem}
+                  onRequestRemove={handleRequestRemove}
                 />
               ))}
             </div>
@@ -155,6 +164,37 @@ export default function WatchlistPage() {
           )}
         </div>
       </main>
+
+      {/* Delete confirmation Modal */}
+      <Modal
+        open={deleteModalOpen && !!pendingDeleteItem}
+        title="Remove from watchlist?"
+        onClose={closeDeleteModal}
+        actions={
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={closeDeleteModal}
+              className="px-6 py-2 rounded-lg text-sm font-medium border border-brand-border text-brand-text-body hover:bg-brand-bg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmRemove}
+              className="px-6 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors shadow-sm"
+            >
+              Remove
+            </button>
+          </div>
+        }
+      >
+        <p>
+          {pendingDeleteItem
+            ? `Are you sure you want to remove "${pendingDeleteItem.title}" from your watchlist?`
+            : 'Are you sure you want to remove this title from your watchlist?'}
+        </p>
+      </Modal>
     </div>
   );
 }

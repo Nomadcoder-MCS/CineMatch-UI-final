@@ -5,7 +5,7 @@ import api from '../api/client';
 /**
  * WatchlistItem - Displays watchlist entry with poster, synopsis, and metadata
  */
-export default function WatchlistItem({ item, onUpdate, onRemove }) {
+export default function WatchlistItem({ item, onUpdate, onRequestRemove }) {
   const [isWatched, setIsWatched] = useState(item.watched);
 
   const handleToggleWatched = async () => {
@@ -22,16 +22,11 @@ export default function WatchlistItem({ item, onUpdate, onRemove }) {
     }
   };
 
-  const handleRemove = async () => {
-    if (confirm(`Remove "${item.title}" from your watchlist?`)) {
-      try {
-        await api.delete(`/api/watchlist/${item.movie_id}`);
-        if (onRemove) onRemove(item.movie_id);
-        if (onUpdate) onUpdate();
-      } catch (error) {
-        console.error('Error removing from watchlist:', error);
-        alert('Could not remove from watchlist');
-      }
+  const handleRemove = () => {
+    // Request removal - opens confirmation modal in parent
+    // No deletion happens until user confirms in modal
+    if (onRequestRemove) {
+      onRequestRemove(item);
     }
   };
 
