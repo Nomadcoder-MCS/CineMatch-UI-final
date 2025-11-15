@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import TopNavSignedIn from '../components/TopNavSignedIn';
 import TagChip from '../components/TagChip';
+import Modal from '../components/Modal';
 import api from '../api/client';
 
 /**
@@ -24,6 +25,9 @@ export default function ProfilePage() {
   const [isEditingPreferences, setIsEditingPreferences] = useState(false);
   const [editedPreferences, setEditedPreferences] = useState(null);
   const [isSavingPreferences, setIsSavingPreferences] = useState(false);
+  
+  // Modal state for preferences saved confirmation
+  const [savedModalOpen, setSavedModalOpen] = useState(false);
 
   // Available options for preferences
   const availableGenres = ['action', 'adventure', 'animation', 'comedy', 'crime', 'documentary', 'drama', 'fantasy', 'horror', 'mystery', 'romance', 'sci-fi', 'thriller', 'western'];
@@ -72,13 +76,18 @@ export default function ProfilePage() {
       setPreferences(updated);
       setIsEditingPreferences(false);
       setEditedPreferences(null);
-      alert('Preferences updated successfully!');
+      // Show success modal instead of alert
+      setSavedModalOpen(true);
     } catch (error) {
       console.error('Error saving preferences:', error);
       alert('Failed to save preferences. Please try again.');
     } finally {
       setIsSavingPreferences(false);
     }
+  };
+
+  const handleCloseSavedModal = () => {
+    setSavedModalOpen(false);
   };
 
   const toggleGenre = (genre) => {
@@ -334,6 +343,15 @@ export default function ProfilePage() {
           </p>
         </div>
       </main>
+
+      {/* Preferences saved success Modal */}
+      <Modal
+        open={savedModalOpen}
+        title="Preferences saved"
+        onClose={handleCloseSavedModal}
+      >
+        <p>Your preferences have been updated successfully.</p>
+      </Modal>
     </div>
   );
 }

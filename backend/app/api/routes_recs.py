@@ -96,12 +96,14 @@ async def get_recommendations_for_user(
         # Parse preferences (pipe-separated strings → lists)
         preferred_genres = []
         services = []
+        languages = []
         runtime_min = 80
         runtime_max = 180
         
         if db_prefs:
             preferred_genres = db_prefs.preferred_genres.split('|') if db_prefs.preferred_genres else []
             services = db_prefs.services.split('|') if db_prefs.services else []
+            languages = db_prefs.original_languages.split('|') if db_prefs.original_languages else []
             runtime_min = db_prefs.runtime_min or 80
             runtime_max = db_prefs.runtime_max or 180
         
@@ -154,7 +156,8 @@ async def get_recommendations_for_user(
             preferred_genres=preferred_genres,
             services=services,
             runtime_min=runtime_min,
-            runtime_max=runtime_max
+            runtime_max=runtime_max,
+            languages=languages
         )
         
         # Get recommendations from ML model with mode-specific params

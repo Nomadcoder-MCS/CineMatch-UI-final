@@ -34,6 +34,7 @@ class UserPreferences:
     services: list[str] = None
     runtime_min: Optional[int] = None
     runtime_max: Optional[int] = None
+    languages: list[str] = None  # Preferred languages (e.g., ["en", "es"])
     
     def __post_init__(self):
         # Initialize empty lists if None
@@ -42,6 +43,7 @@ class UserPreferences:
         self.not_interested_ids = self.not_interested_ids or []  # Hard exclusion
         self.preferred_genres = self.preferred_genres or []
         self.services = self.services or []
+        self.languages = self.languages or []
 
 
 class CineMatchRecommender:
@@ -79,6 +81,9 @@ class CineMatchRecommender:
             movie['movieId']: idx 
             for idx, movie in enumerate(self.movies_meta)
         }
+        
+        # Compute and cache popularity scores for normalization
+        self._popularity_scores = self._compute_normalized_popularity()
         
         print(f"✓ Loaded {len(self.movies_meta)} movies")
         print(f"✓ Feature matrix shape: {self.item_features.shape}")
@@ -274,12 +279,35 @@ class CineMatchRecommender:
             return runtime > 150
         return True
     
-    def compute_popularity_scores(self) -> np.ndarray:
+    def _compute_normalized_popularity(self) -> np.ndarray:
         """
-        Compute popularity scores for all movies
-        Simple heuristic: normalize year (recent = more popular)
-        In production, you'd use actual view counts, ratings, etc.
+        Compute and cache normalized popularity scores for all movies
+        
+        Returns:
+            Array of popularity scores normalized to [0, 1]
         """
+        # Extract popularity from metadata (TMDb popularity field)
+        # If not available, use vote_count as a proxy
+        popularity_values = []
+        
+        for movie in self.movies_meta:
+            # Try popularity first, then vote_count, then default to 0
+            pop = movie.get('popularity', movie.get('vote_count', 0))
+            popularity_values.append(pop if pop is not None else 0)
+        
+        popularity = np.array(popularity_values, dtype=float)
+        
+        # Normalize to [0, 1] using min-max scaling
+        min_pop = popularity.min()
+        max_pop = popularity.max()
+        
+        if max_pop > min_pop:
+            normalized = (popularity - min_pop) / (max_pop - min_pop)
+        else:
+            # All movies have same popularity - use neutral value
+            normalized = np.full(len(popularity), 0.5)
+        
+        # Handle year for recency boost (newer movies get slight boost)
         years = []
         for movie in self.movies_meta:
             year = movie.get('year', 2000)
@@ -289,19 +317,141 @@ class CineMatchRecommender:
             years.append(year)
         
         years = np.array(years)
+        current_year = 2024
+        recency_boost = np.clip((years - 1980) / (current_year - 1980), 0, 1) * 0.2
         
-        # Normalize to [0, 1] with recent years scoring higher
-        min_year = years.min()
-        max_year = years.max()
-        if max_year > min_year:
-            popularity = (years - min_year) / (max_year - min_year)
-        else:
-            popularity = np.ones(len(years))
+        # Combine popularity with recency boost
+        popularity = normalized + recency_boost
         
-        # Ensure no NaN values in output
+        # Sanitize any remaining NaN/inf values
         popularity = np.nan_to_num(popularity, nan=0.5, posinf=1.0, neginf=0.0)
         
+        # Re-normalize to [0, 1]
+        min_pop = popularity.min()
+        max_pop = popularity.max()
+        if max_pop > min_pop:
+            popularity = (popularity - min_pop) / (max_pop - min_pop)
+        
         return popularity
+    
+    def compute_preference_alignment(self, movie_idx: int, prefs: UserPreferences) -> float:
+        """
+        Compute preference alignment score for a single movie
+        
+        Measures how well a movie matches explicit user preferences:
+        - Genre overlap (0.5 weight)
+        - Service match (0.25 weight)
+        - Runtime match (0.15 weight)
+        - Language match (0.10 weight)
+        
+        Returns:
+            Alignment score in range [0, 1]
+        """
+        movie = self.movies_meta[movie_idx]
+        alignment = 0.0
+        
+        # Genre overlap (strongest component: 0.5 weight)
+        if prefs.preferred_genres:
+            movie_genres = set(g.lower() for g in movie.get('genres', '').split('|') if g)
+            pref_genres = set(g.lower() for g in prefs.preferred_genres)
+            
+            if movie_genres and pref_genres:
+                # Jaccard-style overlap
+                intersection = len(movie_genres & pref_genres)
+                union = len(movie_genres | pref_genres)
+                genre_score = intersection / union if union > 0 else 0
+                alignment += 0.5 * genre_score
+        
+        # Service match (0.25 weight)
+        if prefs.services:
+            movie_services = set(movie.get('services', '').split('|'))
+            pref_services = set(prefs.services)
+            
+            if movie_services & pref_services:
+                # Binary match (available on at least one preferred service)
+                alignment += 0.25
+        
+        # Runtime match (0.15 weight)
+        runtime = movie.get('runtime')
+        if runtime is not None and isinstance(runtime, (int, float)) and np.isfinite(runtime):
+            # Check if runtime falls within user's preferred bounds
+            in_range = True
+            if prefs.runtime_min is not None and runtime < prefs.runtime_min:
+                in_range = False
+            if prefs.runtime_max is not None and runtime > prefs.runtime_max:
+                in_range = False
+            
+            if in_range:
+                alignment += 0.15
+        else:
+            # Missing runtime - neutral (add half weight)
+            alignment += 0.075
+        
+        # Language match (0.10 weight)
+        if prefs.languages:
+            movie_lang = movie.get('original_language', '').lower()
+            pref_langs = set(lang.lower() for lang in prefs.languages)
+            
+            if movie_lang in pref_langs:
+                alignment += 0.10
+        
+        # Clamp to [0, 1]
+        return min(1.0, max(0.0, alignment))
+    
+    def ensure_genre_coverage(
+        self,
+        ranked_indices: list[int],
+        preferred_genres: list[str],
+        all_scores: np.ndarray,
+        k: int
+    ) -> list[int]:
+        """
+        Ensure each preferred genre gets at least one high-quality representative
+        
+        Args:
+            ranked_indices: All candidate indices sorted by score (descending)
+            preferred_genres: User's preferred genres
+            all_scores: Scores for all movies
+            k: Target number of recommendations
+        
+        Returns:
+            List of indices with genre coverage ensured
+        """
+        if not preferred_genres:
+            return ranked_indices[:k]
+        
+        preferred_genres_lower = [g.lower() for g in preferred_genres]
+        covered_genres = set()
+        seed_list = []
+        seed_set = set()
+        
+        # Find highest-scoring movie for each preferred genre
+        for idx in ranked_indices:
+            if len(covered_genres) >= len(preferred_genres_lower):
+                break  # All genres covered
+            
+            movie = self.movies_meta[idx]
+            movie_genres = set(g.lower() for g in movie.get('genres', '').split('|') if g)
+            
+            # Check if this movie covers an uncovered preferred genre
+            for genre in preferred_genres_lower:
+                if genre in movie_genres and genre not in covered_genres:
+                    seed_list.append(idx)
+                    seed_set.add(idx)
+                    covered_genres.add(genre)
+                    break  # Only count this movie once
+        
+        print(f"  Genre coverage: ensured {len(covered_genres)}/{len(preferred_genres_lower)} preferred genres")
+        
+        # Fill rest of slots with top-scoring movies not already in seed
+        final_list = seed_list.copy()
+        for idx in ranked_indices:
+            if len(final_list) >= k:
+                break
+            if idx not in seed_set:
+                final_list.append(idx)
+        
+        return final_list[:k]
     
     def diversify_by_genre(
         self,
@@ -482,24 +632,46 @@ class CineMatchRecommender:
         # Handle NaN values in similarities (can occur with sparse/zero vectors)
         similarities = np.nan_to_num(similarities, nan=0.0, posinf=1.0, neginf=0.0)
         
-        # Apply mode-specific scoring
-        if mode == "trending":
-            # Blend similarity with popularity
-            popularity = self.compute_popularity_scores()
-            combined_scores = 0.7 * similarities + 0.3 * popularity
-            print("  Applied trending boost (70% similarity + 30% popularity)")
-        else:
-            combined_scores = similarities.copy()
+        # Get cached popularity scores (already normalized to [0, 1])
+        popularity_scores = self._popularity_scores
         
-        # Apply genre boosting if user has preferred genres
-        if prefs.preferred_genres and mode not in ["genre"]:  # Don't double-boost in genre mode
-            preferred_genres_lower = [g.lower() for g in prefs.preferred_genres]
-            for idx, movie in enumerate(self.movies_meta):
-                movie_genres = [g.lower() for g in movie.get('genres', '').split('|')]
-                # Boost score by 0.15 if movie has at least one preferred genre
-                if any(g in preferred_genres_lower for g in movie_genres):
-                    combined_scores[idx] += 0.15
-            print(f"  Applied genre boost for preferred genres: {prefs.preferred_genres}")
+        # Compute preference alignment scores for all movies
+        print("  Computing preference alignment scores...")
+        alignment_scores = np.array([
+            self.compute_preference_alignment(idx, prefs)
+            for idx in range(len(self.movies_meta))
+        ])
+        
+        # Generate noise for tie-breaking
+        np.random.seed(42)  # For reproducibility in same session
+        noise = np.random.random(len(self.movies_meta))
+        
+        # Mode-aware weight tuning
+        if mode == "because_liked":
+            # Bias toward similarity (learned taste)
+            w_sim, w_align, w_pop, w_noise = 0.65, 0.25, 0.08, 0.02
+        elif mode == "trending":
+            # Increase popularity weight
+            w_sim, w_align, w_pop, w_noise = 0.50, 0.25, 0.23, 0.02
+        elif mode in ["genre", "service"]:
+            # Bias toward preference alignment
+            w_sim, w_align, w_pop, w_noise = 0.50, 0.40, 0.08, 0.02
+        else:
+            # Default balanced weights
+            w_sim, w_align, w_pop, w_noise = 0.60, 0.30, 0.08, 0.02
+        
+        # Compute weighted final scores
+        combined_scores = (
+            w_sim * similarities +
+            w_align * alignment_scores +
+            w_pop * popularity_scores +
+            w_noise * noise
+        )
+        
+        print(f"  Scoring weights: sim={w_sim}, align={w_align}, pop={w_pop}, noise={w_noise}")
+        print(f"  Average similarity: {similarities.mean():.3f}")
+        print(f"  Average preference alignment: {alignment_scores.mean():.3f}")
+        print(f"  Average popularity: {popularity_scores.mean():.3f}")
         
         # Get top candidates (before filtering)
         top_indices = np.argsort(combined_scores)[::-1][:top_k * 10]  # Get 10x for filtering
@@ -518,7 +690,7 @@ class CineMatchRecommender:
             if movie_id in prefs.disliked_movie_ids:
                 continue
             
-            # Mode-specific filters
+            # Mode-specific filters (hard filters only for explicit mode constraints)
             if mode == "genre" and filter_genre:
                 movie_genres = movie['genres'].split('|')
                 if filter_genre.lower() not in [g.lower() for g in movie_genres]:
@@ -537,60 +709,42 @@ class CineMatchRecommender:
                 if not self.filter_by_runtime_bucket(movie, filter_runtime_bucket):
                     continue
             
-            # Apply user preference filters (for all modes)
-            # Runtime filter
-            runtime = movie['runtime']
-            if prefs.runtime_min and runtime < prefs.runtime_min:
-                continue
-            if prefs.runtime_max and runtime > prefs.runtime_max:
-                continue
-            
-            # Genre filter (only if not in genre mode to avoid double-filtering)
-            if mode != "genre" and prefs.preferred_genres:
-                movie_genres = movie['genres'].split('|')
-                if not any(g in movie_genres for g in prefs.preferred_genres):
-                    continue
-            
-            # Service filter (only if not in service mode)
-            if mode != "service" and prefs.services:
-                movie_services = movie['services'].split('|')
-                if not any(s in movie_services for s in prefs.services):
-                    continue
+            # Note: User preferences (genres, services, runtime) are now handled via
+            # soft preference_alignment scoring, not hard filters
+            # This prevents echo chamber and allows broader discovery
             
             filtered_indices.append(idx)
             
             # Stop once we have enough (get extra for diversification)
-            if len(filtered_indices) >= top_k * 2:
+            if len(filtered_indices) >= top_k * 3:
                 break
         
         print(f"✓ Filtered to {len(filtered_indices)} candidate recommendations")
         
-        # Apply genre diversification if user has preferred genres
+        # Step 1: Ensure genre coverage (each preferred genre gets at least one rep)
         if prefs.preferred_genres and len(filtered_indices) > top_k:
-            diversified_indices = self.diversify_by_genre(
+            covered_indices = self.ensure_genre_coverage(
                 filtered_indices,
                 prefs.preferred_genres,
-                k=top_k,
-                max_per_genre=6
-            )
-            print(f"  → Diversified to {len(diversified_indices)} recommendations (max 6 per genre)")
-        else:
-            diversified_indices = filtered_indices[:top_k]
-        
-        # Add exploration component for underrepresented genres
-        if prefs.preferred_genres and mode == "because_liked":
-            final_indices = self.add_exploration_movies(
-                diversified_indices,
-                prefs.preferred_genres,
                 combined_scores,
-                prefs,
-                num_explore=2
+                k=top_k * 2  # Get 2x for diversification step
             )
         else:
-            final_indices = diversified_indices
+            covered_indices = filtered_indices[:top_k * 2]
         
-        # Ensure we don't exceed top_k (exploration might add a few extra)
-        final_indices = final_indices[:top_k + 2]  # Allow 2 extra for exploration
+        # Step 2: Apply genre diversification (cap single genre dominance)
+        if prefs.preferred_genres and len(covered_indices) > top_k:
+            # Cap any single genre to max 50% of results (10 out of 20)
+            max_per_genre = max(3, int(top_k * 0.5))
+            final_indices = self.diversify_by_genre(
+                covered_indices,
+                prefs.preferred_genres,
+                k=top_k,
+                max_per_genre=max_per_genre
+            )
+            print(f"  → Diversified: max {max_per_genre} movies per genre")
+        else:
+            final_indices = covered_indices[:top_k]
         
         print(f"✓ Final: {len(final_indices)} personalized recommendations")
         
