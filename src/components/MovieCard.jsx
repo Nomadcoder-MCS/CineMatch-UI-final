@@ -10,7 +10,13 @@ import api from '../api/client';
  * - 👎 (dislike): Negative signal - can down-weight but not hard exclude
  * - "Not interested": Hard exclusion - movie will NEVER appear in recommendations again
  */
-export default function MovieCard({ movie, onRemove, onShowWhyThis, onAddToWatchlistSuccess }) {
+export default function MovieCard({ 
+  movie, 
+  onRemove, 
+  onShowWhyThis, 
+  onAddToWatchlistSuccess,
+  onError 
+}) {
   const [feedback, setFeedback] = useState(null); // 'like' | 'dislike' | null
 
   /**
@@ -29,6 +35,9 @@ export default function MovieCard({ movie, onRemove, onShowWhyThis, onAddToWatch
     } catch (error) {
       console.error('Error recording like:', error);
       setFeedback(null); // Revert on error
+      if (onError) {
+        onError(error.message || 'Unable to record your like. Please try again.');
+      }
     }
   };
 
@@ -48,6 +57,9 @@ export default function MovieCard({ movie, onRemove, onShowWhyThis, onAddToWatch
     } catch (error) {
       console.error('Error recording dislike:', error);
       setFeedback(null); // Revert on error
+      if (onError) {
+        onError(error.message || 'Unable to record your dislike. Please try again.');
+      }
     }
   };
 
@@ -72,7 +84,9 @@ export default function MovieCard({ movie, onRemove, onShowWhyThis, onAddToWatch
       }
     } catch (error) {
       console.error('Error marking not interested:', error);
-      alert('Could not mark as not interested. Please try again.');
+      if (onError) {
+        onError(error.message || 'Unable to mark as not interested. Please try again.');
+      }
     }
   };
 
@@ -89,14 +103,21 @@ export default function MovieCard({ movie, onRemove, onShowWhyThis, onAddToWatch
       }
     } catch (error) {
       console.error('Error adding to watchlist:', error);
-      alert('Could not add to watchlist. Make sure you are signed in.');
+      if (onError) {
+        onError(error.message || 'Unable to add to watchlist. Please try again.');
+      }
     }
   };
 
   const handleWhyThis = () => {
-    // Use ML-generated explanation if available
+    // Use ML-generated explanation if available from backend
     const explanation = movie.explanation || 
-      `Why we recommended "${movie.title}":\n\n• Matches your preferred genres\n• High rating from users with similar taste\n• Available on your connected streaming services`;
+      `Why we recommended "${movie.title}":\n\n` +
+      `• Matches your taste profile based on content analysis\n` +
+      `• Genres: ${movie.genres?.slice(0, 3).join(', ') || 'Various'}\n` +
+      `• Available on: ${movie.services?.slice(0, 2).join(', ') || 'Multiple services'}\n\n` +
+      `CineMatch uses content-based AI to analyze movie plots, genres, and features, ` +
+      `comparing them to your likes and preferences to find matches.`;
     
     // Call parent handler to show modal instead of alert
     if (onShowWhyThis) {
@@ -121,10 +142,10 @@ export default function MovieCard({ movie, onRemove, onShowWhyThis, onAddToWatch
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-brand-border p-6 hover:shadow-md transition-shadow">
-      <div className="flex gap-6">
+    <div className="bg-white rounded-2xl shadow-sm border border-brand-border p-4 sm:p-6 hover:shadow-md transition-shadow">
+      <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
         {/* Poster */}
-        <div className="flex-shrink-0">
+        <div className="flex-shrink-0 mx-auto sm:mx-0">
           {posterUrl ? (
             <img
               src={posterUrl}
@@ -147,7 +168,7 @@ export default function MovieCard({ movie, onRemove, onShowWhyThis, onAddToWatch
         </div>
 
         {/* Content */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0">
           {/* Title and meta */}
           <div className="mb-2">
             <h3 className="text-xl font-bold text-brand-text-primary mb-1">
@@ -173,8 +194,8 @@ export default function MovieCard({ movie, onRemove, onShowWhyThis, onAddToWatch
             ))}
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center gap-3 mt-auto">
+          {/* Actions - wrapped flexbox for responsive layout */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-auto">
             <button
               onClick={handleThumbsUp}
               className={`p-2 rounded-lg transition-colors ${
@@ -211,7 +232,7 @@ export default function MovieCard({ movie, onRemove, onShowWhyThis, onAddToWatch
             </button>
             <button
               onClick={handleWhyThis}
-              className="px-3 py-2 text-xs text-brand-purple hover:bg-brand-purple/10 rounded-lg transition-colors ml-auto"
+              className="px-3 py-2 text-xs text-brand-purple hover:bg-brand-purple/10 rounded-lg transition-colors sm:ml-auto"
             >
               Why this?
             </button>

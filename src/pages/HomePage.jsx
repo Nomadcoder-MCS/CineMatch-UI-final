@@ -5,6 +5,7 @@ import TopNavSignedIn from '../components/TopNavSignedIn';
 import FilterChip from '../components/FilterChip';
 import MovieCard from '../components/MovieCard';
 import Modal from '../components/Modal';
+import Toast from '../components/Toast';
 import api from '../api/client';
 
 /**
@@ -43,11 +44,29 @@ export default function HomePage() {
   const [watchlistModalOpen, setWatchlistModalOpen] = useState(false);
   const [watchlistModalTitle, setWatchlistModalTitle] = useState(null);
 
+  // Toast state for error notifications
+  const [toastOpen, setToastOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState('error');
+
+  /**
+   * Show error toast to user
+   */
+  const showErrorToast = (message) => {
+    setToastMessage(message);
+    setToastType('error');
+    setToastOpen(true);
+  };
+
   /**
    * Load user preferences from backend
    */
   const loadPreferences = async () => {
-    if (!user || !user.id) return;
+    // Double-check authentication before making API call
+    if (!authReady || !user || !user.id) {
+      console.warn('Cannot load preferences: user not authenticated');
+      return;
+    }
     
     try {
       const prefs = await api.get('/api/preferences/me');
@@ -62,6 +81,13 @@ export default function HomePage() {
       }
     } catch (error) {
       console.error('Error loading preferences:', error);
+      // Don't show error toast for auth errors - user will be redirected
+      if (error.isAuthError || error.status === 401) {
+        console.warn('Authentication error loading preferences - redirecting to login');
+        navigate('/');
+        return;
+      }
+      showErrorToast(error.message || 'Unable to load your preferences. Some features may not work correctly.');
     }
   };
 
@@ -70,11 +96,15 @@ export default function HomePage() {
    * Only called when authReady is true and user exists
    */
   const loadRecommendations = async () => {
-    // Guard: Don't fetch if user is not available
-    if (!user || !user.id) {
-      console.warn('Cannot load recommendations: user not available');
-      setError('User not authenticated');
+    // Guard: Don't fetch if auth is not ready or user is not available
+    if (!authReady || !user || !user.id) {
+      console.warn('Cannot load recommendations: user not authenticated');
+      setError('Please sign in to view recommendations');
       setLoading(false);
+      // Redirect to landing page if not authenticated
+      if (authReady && !user) {
+        navigate('/');
+      }
       return;
     }
 
@@ -103,11 +133,23 @@ export default function HomePage() {
       // API client automatically attaches X-User-Id header from localStorage
       const response = await api.get(`/api/recommendations?${params.toString()}`);
       setMovies(response.recommendations || []);
+      setError(null);
       console.log(`✓ Loaded ${response.count} personalized recommendations (mode: ${mode})`);
     } catch (error) {
       console.error('Error loading recommendations:', error);
-      setError('Could not load recommendations. Please try again.');
+      
+      // Handle authentication errors by redirecting
+      if (error.isAuthError || error.status === 401 || error.isValidationError) {
+        console.warn('Authentication error loading recommendations - redirecting to login');
+        setError('Please sign in to view recommendations');
+        navigate('/');
+        return;
+      }
+      
+      const errorMessage = error.message || 'Unable to load recommendations. Please try again.';
+      setError(errorMessage);
       setMovies([]);
+      showErrorToast(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -122,9 +164,16 @@ export default function HomePage() {
 
   // Load preferences when user is available
   useEffect(() => {
-    if (authReady && user && user.id) {
-      loadPreferences();
+    // Only load preferences if auth is ready AND user exists
+    if (!authReady) {
+      return; // Wait for auth to be ready
     }
+    
+    if (!user || !user.id) {
+      return; // No user, don't make API call
+    }
+    
+    loadPreferences();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authReady, user?.id]);
 
@@ -229,12 +278,28 @@ export default function HomePage() {
           <h1 className="text-3xl font-bold text-brand-text-primary mb-2">
             Welcome back, {firstName}
           </h1>
-          <p className="text-base text-brand-text-body">
+          <p className="text-base text-brand-text-body mb-3">
             {movies.length > 0 
               ? "Tonight's picks based on your preferences and viewing history"
               : "Set your preferences in Profile to get personalized recommendations"
             }
           </p>
+          {/* AI Explainer Box */}
+          <div className="bg-brand-purple/5 border border-brand-purple/20 rounded-xl px-4 py-3 mt-4">
+            <div className="flex items-start gap-3">
+              <div className="text-2xl flex-shrink-0">🤖</div>
+              <div className="flex-1">
+                <p className="text-sm text-brand-text-body">
+                  <strong className="text-brand-purple font-semibold">How recommendations work:</strong> CineMatch uses 
+                  content-based AI to analyze movie plots, genres, and features. It compares thousands of movies to your 
+                  profile—built from your likes, preferences, and viewing patterns—to find the best matches for you.
+                </p>
+                <p className="text-xs text-brand-text-secondary mt-2">
+                  👍 Like movies to help the AI learn your taste • ⚙️ Set preferences in your Profile to guide recommendations
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Mode selection */}
@@ -361,33 +426,41 @@ export default function HomePage() {
         {/* Main content area */}
         <div className="bg-white rounded-2xl shadow-md px-8 py-8">
           {loading ? (
-            <div className="text-center py-12">
-              <div className="text-4xl mb-4">🎬</div>
-              <p className="text-brand-text-body">Loading your personalized recommendations...</p>
+            /* Loading state */
+            <div className="text-center py-16">
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-brand-orange mb-4"></div>
+              <p className="text-lg text-brand-text-primary font-medium mb-2">Loading recommendations...</p>
+              <p className="text-sm text-brand-text-secondary">Finding the perfect movies for you</p>
             </div>
           ) : error ? (
-            <div className="text-center py-12">
-              <div className="text-4xl mb-4">⚠️</div>
-              <p className="text-brand-text-body mb-4">{error}</p>
+            /* Error state */
+            <div className="text-center py-16">
+              <div className="text-6xl mb-4">⚠️</div>
+              <p className="text-lg text-brand-text-primary font-medium mb-2">Unable to load recommendations</p>
+              <p className="text-sm text-brand-text-body mb-6">{error}</p>
               <button
                 onClick={loadRecommendations}
-                className="px-6 py-2 bg-brand-orange text-white rounded-lg hover:bg-[#e05d00] transition-colors"
+                className="px-6 py-2 bg-brand-orange text-white rounded-lg hover:bg-[#e05d00] transition-colors font-medium"
               >
                 Try Again
               </button>
             </div>
           ) : movies.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="text-4xl mb-4">🎯</div>
-              <p className="text-brand-text-body mb-2">
+            /* Empty state */
+            <div className="text-center py-16">
+              <div className="text-6xl mb-4">🎬</div>
+              <h3 className="text-xl font-semibold text-brand-text-primary mb-2">
                 No recommendations yet
+              </h3>
+              <p className="text-base text-brand-text-body mb-2">
+                We need a bit more information to find great movies for you.
               </p>
               <p className="text-sm text-brand-text-secondary mb-6">
-                Set your preferences in your Profile to get personalized movie picks!
+                Set your preferences and start liking movies to train your personalized recommendations.
               </p>
               <button
                 onClick={() => navigate('/profile')}
-                className="px-6 py-2 bg-brand-orange text-white rounded-lg hover:bg-[#e05d00] transition-colors"
+                className="px-8 py-3 bg-brand-orange text-white rounded-xl font-semibold text-base hover:bg-[#e05d00] transition-colors shadow-md"
               >
                 Set Preferences
               </button>
@@ -403,6 +476,7 @@ export default function HomePage() {
                     onRemove={() => handleMovieRemoved(movie.movie_id)}
                     onShowWhyThis={handleShowWhyThis}
                     onAddToWatchlistSuccess={openWatchlistModal}
+                    onError={showErrorToast}
                   />
                 ))}
               </div>
@@ -468,6 +542,15 @@ export default function HomePage() {
             : 'This movie has been added to your watchlist.'}
         </p>
       </Modal>
+
+      {/* Error Toast */}
+      <Toast
+        message={toastMessage}
+        type={toastType}
+        isOpen={toastOpen}
+        onClose={() => setToastOpen(false)}
+        duration={6000}
+      />
     </div>
   );
 }

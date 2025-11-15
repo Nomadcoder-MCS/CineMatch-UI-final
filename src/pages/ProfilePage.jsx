@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import TopNavSignedIn from '../components/TopNavSignedIn';
 import TagChip from '../components/TagChip';
 import Modal from '../components/Modal';
+import Toast from '../components/Toast';
 import api from '../api/client';
 
 /**
@@ -34,10 +35,24 @@ export default function ProfilePage() {
   const [resetSuccessModalOpen, setResetSuccessModalOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
 
+  // Toast state for error notifications
+  const [toastOpen, setToastOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState('error');
+
   // Available options for preferences
   const availableGenres = ['action', 'adventure', 'animation', 'comedy', 'crime', 'documentary', 'drama', 'fantasy', 'horror', 'mystery', 'romance', 'sci-fi', 'thriller', 'western'];
   const availableServices = ['Netflix', 'Hulu', 'Amazon Prime', 'HBO Max', 'Disney+'];
   const availableLanguages = ['en', 'es', 'fr', 'de', 'ja', 'ko'];
+
+  /**
+   * Show error toast to user
+   */
+  const showErrorToast = (message) => {
+    setToastMessage(message);
+    setToastType('error');
+    setToastOpen(true);
+  };
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -56,10 +71,13 @@ export default function ProfilePage() {
         setPreferences(prefs);
       } catch (error) {
         console.error('Error loading preferences:', error);
+        const errorMessage = error.message || 'Unable to load your preferences. Please try again.';
+        showErrorToast(errorMessage);
       }
     };
 
     loadPreferences();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const handleEditPreferences = () => {
@@ -85,7 +103,8 @@ export default function ProfilePage() {
       setSavedModalOpen(true);
     } catch (error) {
       console.error('Error saving preferences:', error);
-      alert('Failed to save preferences. Please try again.');
+      const errorMessage = error.message || 'Unable to save preferences. Please try again.';
+      showErrorToast(errorMessage);
     } finally {
       setIsSavingPreferences(false);
     }
@@ -111,7 +130,9 @@ export default function ProfilePage() {
       setResetSuccessModalOpen(true);
     } catch (error) {
       console.error('Error resetting recommendations:', error);
-      alert('Failed to reset recommendations. Please try again.');
+      const errorMessage = error.message || 'Unable to reset recommendations. Please try again.';
+      showErrorToast(errorMessage);
+      setResetConfirmModalOpen(false);
     } finally {
       setIsResetting(false);
     }
@@ -204,18 +225,25 @@ export default function ProfilePage() {
         {/* Preferences */}
         <div className="bg-white rounded-2xl shadow-md px-8 py-6 mb-6">
           <div className="flex justify-between items-start mb-4">
-            <h2 className="text-xl font-semibold text-brand-text-primary">
-              Preferences
-            </h2>
+            <div>
+              <h2 className="text-xl font-semibold text-brand-text-primary mb-2">
+                Preferences
+              </h2>
+              <p className="text-sm text-brand-text-body max-w-2xl">
+                These preferences help guide the AI when you're just getting started or haven't liked many movies yet. 
+                As you use CineMatch and give feedback (👍 👎), the AI learns your unique taste and refines 
+                recommendations beyond these initial settings.
+              </p>
+            </div>
             {!isEditingPreferences ? (
               <button 
                 onClick={handleEditPreferences}
-                className="text-sm text-brand-orange hover:text-brand-purple transition-colors font-medium"
+                className="text-sm text-brand-orange hover:text-brand-purple transition-colors font-medium flex-shrink-0"
               >
                 Edit preferences
               </button>
             ) : (
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-shrink-0">
                 <button 
                   onClick={handleCancelEditPreferences}
                   className="px-4 py-2 text-sm text-brand-text-body border border-brand-border rounded-lg hover:bg-brand-bg transition-colors"
@@ -377,17 +405,21 @@ export default function ProfilePage() {
         {/* Reset recommendations - Danger Zone */}
         <div className="bg-white rounded-2xl shadow-md px-8 py-6 border-2 border-red-100">
           <h2 className="text-xl font-semibold text-brand-text-primary mb-3">
-            Reset Recommendations
+            Reset AI Learning
           </h2>
+          <p className="text-sm text-brand-text-body mb-3">
+            <strong>Clear the AI's learned taste profile</strong> so it starts fresh. This removes all your likes, 
+            dislikes, and "not interested" signals—the feedback the AI uses to understand your preferences.
+          </p>
           <p className="text-sm text-brand-text-body mb-4">
-            Clear your likes, dislikes, and "not interested" feedback so CineMatch can relearn your taste from scratch. 
-            Your profile settings and watchlist will not be changed.
+            After resetting, recommendations will be based purely on your profile preferences (genres, services, 
+            runtime) until you provide new feedback. Your explicit preferences and watchlist remain unchanged.
           </p>
           <button
             onClick={handleOpenResetConfirm}
             className="px-6 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
           >
-            Reset recommendations
+            Reset AI learning
           </button>
         </div>
       </main>
@@ -404,7 +436,7 @@ export default function ProfilePage() {
       {/* Reset confirmation Modal */}
       <Modal
         open={resetConfirmModalOpen}
-        title="Reset recommendations?"
+        title="Reset AI learning?"
         onClose={handleCloseResetConfirm}
         actions={
           <div className="flex gap-3">
@@ -426,29 +458,43 @@ export default function ProfilePage() {
           </div>
         }
       >
-        <p className="mb-3">This will clear:</p>
-        <ul className="list-disc list-inside mb-3 text-sm space-y-1">
-          <li>All your likes and dislikes</li>
+        <p className="mb-3 text-brand-text-body">
+          This will clear the feedback history the AI uses to learn your taste:
+        </p>
+        <ul className="list-disc list-inside mb-3 text-sm space-y-1 text-brand-text-body">
+          <li>All your likes and dislikes (👍 👎)</li>
           <li>All movies marked as "not interested"</li>
         </ul>
-        <p className="mb-3">This will NOT change:</p>
-        <ul className="list-disc list-inside mb-3 text-sm space-y-1">
+        <p className="mb-3 text-brand-text-body">
+          <strong>What stays:</strong>
+        </p>
+        <ul className="list-disc list-inside mb-3 text-sm space-y-1 text-brand-text-body">
           <li>Your profile preferences (genres, services, runtime)</li>
           <li>Your watchlist</li>
         </ul>
         <p className="text-sm text-brand-text-secondary">
-          Recommendations may feel more generic at first and will adapt as you give new feedback.
+          After resetting, the AI will recommend based on your profile preferences until you give new feedback. 
+          Recommendations will feel more generic at first and will personalize again as you use the app.
         </p>
       </Modal>
 
       {/* Reset success Modal */}
       <Modal
         open={resetSuccessModalOpen}
-        title="Recommendations reset"
+        title="AI learning reset"
         onClose={handleCloseResetSuccess}
       >
-        <p>Your feedback history has been cleared. We'll now base suggestions on your profile preferences and new feedback you provide.</p>
+        <p>Your feedback history has been cleared. The AI will now recommend movies based on your profile preferences and any new feedback you provide.</p>
       </Modal>
+
+      {/* Error Toast */}
+      <Toast
+        message={toastMessage}
+        type={toastType}
+        isOpen={toastOpen}
+        onClose={() => setToastOpen(false)}
+        duration={6000}
+      />
     </div>
   );
 }

@@ -219,33 +219,83 @@ class CineMatchRecommender:
         return filtered
     
     def generate_explanation(self, movie: dict, prefs: UserPreferences) -> str:
-        """Generate human-readable explanation for recommendation"""
+        """
+        Generate human-readable explanation for recommendation
+        
+        Explains why this movie was recommended using clear, specific language that references:
+        - Content similarity (genres, themes)
+        - User's liked movies
+        - Explicit preferences (genres, services, runtime, languages)
+        - Popularity/quality signals
+        """
         reasons = []
         
         movie_genres = movie['genres'].split('|')
         movie_services = movie['services'].split('|')
         
-        # Check genre matches
+        # 1. Similar to liked movies (most important signal)
+        if prefs.liked_movie_ids and len(prefs.liked_movie_ids) > 0:
+            reasons.append(
+                f"This movie has similar themes, genres, and style to {len(prefs.liked_movie_ids)} "
+                f"{'movie' if len(prefs.liked_movie_ids) == 1 else 'movies'} you've liked"
+            )
+        
+        # 2. Genre preferences match
         if prefs.preferred_genres:
             matching_genres = [g for g in movie_genres if g in prefs.preferred_genres]
             if matching_genres:
-                reasons.append(f"Matches your preferred genres: {', '.join(matching_genres)}")
+                if len(matching_genres) == 1:
+                    reasons.append(f"Matches your preference for {matching_genres[0]} movies")
+                else:
+                    reasons.append(
+                        f"Matches your preferences for {', '.join(matching_genres[:-1])} "
+                        f"and {matching_genres[-1]} movies"
+                    )
         
-        # Check service availability
+        # 3. Service availability
         if prefs.services:
             matching_services = [s for s in movie_services if s in prefs.services]
             if matching_services:
-                reasons.append(f"Available on {', '.join(matching_services)}")
+                if len(matching_services) == 1:
+                    reasons.append(f"Available on {matching_services[0]}, which you selected")
+                else:
+                    reasons.append(f"Available on services you use: {', '.join(matching_services)}")
         
-        # Check if similar to liked movies
-        if prefs.liked_movie_ids:
-            reasons.append("Similar to movies you've liked")
+        # 4. Runtime fit (if user has preference)
+        runtime = movie.get('runtime')
+        if runtime and (prefs.runtime_min or prefs.runtime_max):
+            if prefs.runtime_min and runtime >= prefs.runtime_min:
+                if prefs.runtime_max and runtime <= prefs.runtime_max:
+                    reasons.append(f"Runtime ({runtime} min) fits your preferred range")
         
-        # Default explanation
+        # 5. Language match
+        movie_language = movie.get('original_language', 'en')
+        if prefs.languages and movie_language in prefs.languages:
+            lang_names = {'en': 'English', 'es': 'Spanish', 'fr': 'French', 'de': 'German', 'ja': 'Japanese', 'ko': 'Korean'}
+            lang_display = lang_names.get(movie_language, movie_language.upper())
+            reasons.append(f"In {lang_display}, which you selected")
+        
+        # 6. Cold-start fallback: highlight the movie's genres if no other signals
         if not reasons:
-            reasons.append(f"Popular {', '.join(movie_genres[:2])} movie")
+            if len(movie_genres) > 0:
+                genre_list = ', '.join(movie_genres[:2])
+                reasons.append(
+                    f"Recommended based on your genre preferences. This is a {genre_list} movie"
+                )
+            else:
+                reasons.append("Recommended based on popularity and your profile")
         
-        return " • ".join(reasons)
+        # Build final explanation
+        intro = f"Why we recommended \"{movie['title']}\":\n\n"
+        explanation_body = '\n'.join([f"• {reason}" for reason in reasons])
+        
+        # Add a note about the AI method
+        footer = (
+            "\n\nCineMatch uses content-based AI to analyze movie plots, genres, and features, "
+            "comparing them to your likes and preferences to find matches."
+        )
+        
+        return intro + explanation_body + footer
     
     def filter_by_year_bucket(self, movie: dict, year_bucket: str) -> bool:
         """Check if movie falls in the given year bucket"""
