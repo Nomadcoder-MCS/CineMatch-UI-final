@@ -78,6 +78,12 @@ class WatchlistItemResponse(BaseModel):
     service: Optional[str]
     watched: bool
     created_at: datetime
+    # Enriched metadata from recommender
+    poster_url: Optional[str] = None
+    overview: Optional[str] = None
+    year: Optional[int] = None
+    runtime: Optional[int] = None
+    genres: list[str] = Field(default_factory=list)
     
     class Config:
         from_attributes = True
