@@ -92,3 +92,37 @@ def get_my_dislikes(
     
     return [movie_id for (movie_id,) in dislikes]
 
+
+@router.post("/reset")
+def reset_feedback(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Reset all feedback for the current user
+    
+    Clears all likes, dislikes, and not_interested signals so recommendations
+    can start from scratch based on user_preferences (cold-start).
+    
+    Does NOT affect:
+    - user_preferences (genres, services, runtime, languages)
+    - watchlist_items
+    
+    After reset, /api/recommendations will fall back to cold-start behavior
+    using only explicit preferences until new feedback is collected.
+    """
+    # Delete all feedback records for this user
+    deleted_count = db.query(UserFeedback).filter(
+        UserFeedback.user_id == current_user.id
+    ).delete()
+    
+    db.commit()
+    
+    print(f"✓ Reset feedback for user {current_user.id}: deleted {deleted_count} feedback records")
+    
+    return {
+        "success": True,
+        "message": "Feedback history cleared",
+        "deleted_count": deleted_count
+    }
+

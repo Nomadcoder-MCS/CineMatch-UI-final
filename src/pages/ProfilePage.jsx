@@ -29,6 +29,11 @@ export default function ProfilePage() {
   // Modal state for preferences saved confirmation
   const [savedModalOpen, setSavedModalOpen] = useState(false);
 
+  // Modal state for reset recommendations
+  const [resetConfirmModalOpen, setResetConfirmModalOpen] = useState(false);
+  const [resetSuccessModalOpen, setResetSuccessModalOpen] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+
   // Available options for preferences
   const availableGenres = ['action', 'adventure', 'animation', 'comedy', 'crime', 'documentary', 'drama', 'fantasy', 'horror', 'mystery', 'romance', 'sci-fi', 'thriller', 'western'];
   const availableServices = ['Netflix', 'Hulu', 'Amazon Prime', 'HBO Max', 'Disney+'];
@@ -88,6 +93,32 @@ export default function ProfilePage() {
 
   const handleCloseSavedModal = () => {
     setSavedModalOpen(false);
+  };
+
+  const handleOpenResetConfirm = () => {
+    setResetConfirmModalOpen(true);
+  };
+
+  const handleCloseResetConfirm = () => {
+    setResetConfirmModalOpen(false);
+  };
+
+  const handleConfirmReset = async () => {
+    setIsResetting(true);
+    try {
+      await api.post('/api/feedback/reset');
+      setResetConfirmModalOpen(false);
+      setResetSuccessModalOpen(true);
+    } catch (error) {
+      console.error('Error resetting recommendations:', error);
+      alert('Failed to reset recommendations. Please try again.');
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  const handleCloseResetSuccess = () => {
+    setResetSuccessModalOpen(false);
   };
 
   const toggleGenre = (genre) => {
@@ -337,10 +368,27 @@ export default function ProfilePage() {
         </div>
 
         {/* Info card */}
-        <div className="bg-white rounded-2xl shadow-md px-8 py-6">
+        <div className="bg-white rounded-2xl shadow-md px-8 py-6 mb-6">
           <p className="text-sm text-brand-text-secondary text-center">
             Your preferences will be used to personalize your movie recommendations. Update them anytime to get better matches!
           </p>
+        </div>
+
+        {/* Reset recommendations - Danger Zone */}
+        <div className="bg-white rounded-2xl shadow-md px-8 py-6 border-2 border-red-100">
+          <h2 className="text-xl font-semibold text-brand-text-primary mb-3">
+            Reset Recommendations
+          </h2>
+          <p className="text-sm text-brand-text-body mb-4">
+            Clear your likes, dislikes, and "not interested" feedback so CineMatch can relearn your taste from scratch. 
+            Your profile settings and watchlist will not be changed.
+          </p>
+          <button
+            onClick={handleOpenResetConfirm}
+            className="px-6 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
+          >
+            Reset recommendations
+          </button>
         </div>
       </main>
 
@@ -351,6 +399,55 @@ export default function ProfilePage() {
         onClose={handleCloseSavedModal}
       >
         <p>Your preferences have been updated successfully.</p>
+      </Modal>
+
+      {/* Reset confirmation Modal */}
+      <Modal
+        open={resetConfirmModalOpen}
+        title="Reset recommendations?"
+        onClose={handleCloseResetConfirm}
+        actions={
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={handleCloseResetConfirm}
+              className="px-6 py-2 rounded-lg text-sm font-medium border border-brand-border text-brand-text-body hover:bg-brand-bg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmReset}
+              disabled={isResetting}
+              className="px-6 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+            >
+              {isResetting ? 'Resetting...' : 'Reset'}
+            </button>
+          </div>
+        }
+      >
+        <p className="mb-3">This will clear:</p>
+        <ul className="list-disc list-inside mb-3 text-sm space-y-1">
+          <li>All your likes and dislikes</li>
+          <li>All movies marked as "not interested"</li>
+        </ul>
+        <p className="mb-3">This will NOT change:</p>
+        <ul className="list-disc list-inside mb-3 text-sm space-y-1">
+          <li>Your profile preferences (genres, services, runtime)</li>
+          <li>Your watchlist</li>
+        </ul>
+        <p className="text-sm text-brand-text-secondary">
+          Recommendations may feel more generic at first and will adapt as you give new feedback.
+        </p>
+      </Modal>
+
+      {/* Reset success Modal */}
+      <Modal
+        open={resetSuccessModalOpen}
+        title="Recommendations reset"
+        onClose={handleCloseResetSuccess}
+      >
+        <p>Your feedback history has been cleared. We'll now base suggestions on your profile preferences and new feedback you provide.</p>
       </Modal>
     </div>
   );
